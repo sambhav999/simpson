@@ -10,6 +10,11 @@ export class SolanaListener {
   private subscriptionIds: number[] = [];
   private wsConnection: Connection;
   private isRunning = false;
+  private trackedMints: Set<string> = new Set();
+  private isProcessing = false;
+  private eventQueue: KeyedAccountInfo[] = [];
+  private readonly MAX_QUEUE_SIZE = 100;
+
   constructor() {
     this.solana = SolanaService.getInstance();
     this.prisma = PrismaService.getInstance();
@@ -23,11 +28,31 @@ export class SolanaListener {
     this.isRunning = true;
     logger.info('Starting Solana listener...');
 
+    // Load tracked mints into memory
+    await this.refreshTrackedMints();
+
     // Recovery / Restart Handling
     await this.recoverMissedEvents();
 
     await this.subscribeToTokenProgram();
     logger.info('Solana listener started');
+  }
+
+  private async refreshTrackedMints(): Promise<void> {
+    const markets = await this.prisma.market.findMany({
+      select: { yesTokenMint: true, noTokenMint: true },
+      where: { status: 'active' },
+    });
+    this.trackedMints.clear();
+    for (const market of markets) {
+      if (this.solana.validatePublicKey(market.yesTokenMint)) {
+        this.trackedMints.add(market.yesTokenMint);
+      }
+      if (this.solana.validatePublicKey(market.noTokenMint)) {
+        this.trackedMints.add(market.noTokenMint);
+      }
+    }
+    logger.info(`Tracking ${this.trackedMints.size} valid token mints`);
   }
 
   private async recoverMissedEvents(): Promise<void> {
@@ -93,19 +118,34 @@ export class SolanaListener {
       }
     }
     this.subscriptionIds = [];
+    this.eventQueue = [];
     logger.info('Solana listener stopped');
   }
   private async subscribeToTokenProgram(): Promise<void> {
     try {
-      const markets = await this.prisma.market.findMany({
-        select: { yesTokenMint: true, noTokenMint: true, id: true },
-        where: { status: 'active' },
-      });
-      logger.info(`Setting up listeners for ${markets.length} active markets`);
+      logger.info(`Setting up listeners for ${this.trackedMints.size} tracked mints`);
       const subId = this.wsConnection.onProgramAccountChange(
         TOKEN_PROGRAM_ID,
         async (keyedAccountInfo: KeyedAccountInfo, _context: Context) => {
-          await this.handleTokenAccountChange(keyedAccountInfo);
+          // Quick in-memory filter: parse mint from account data BEFORE any DB call
+          const accountData = keyedAccountInfo.accountInfo.data;
+          if (!accountData || accountData.length < 165) return;
+
+          try {
+            const mintBytes = accountData.slice(0, 32);
+            const mint = new PublicKey(mintBytes).toBase58();
+
+            // Only process if this mint belongs to one of our markets
+            if (!this.trackedMints.has(mint)) return;
+
+            // Queue the event instead of processing immediately
+            if (this.eventQueue.length < this.MAX_QUEUE_SIZE) {
+              this.eventQueue.push(keyedAccountInfo);
+              this.processQueue();
+            }
+          } catch {
+            // Invalid mint data, skip
+          }
         },
         'confirmed',
         [
@@ -114,21 +154,41 @@ export class SolanaListener {
       );
       this.subscriptionIds.push(subId);
       logger.info(`Subscribed to SPL Token program with subscription ID ${subId}`);
+
+      // Refresh tracked mints every 5 minutes
+      setInterval(() => this.refreshTrackedMints(), 5 * 60 * 1000);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown';
       logger.error(`Failed to subscribe to token program: ${message}`);
     }
   }
+
+  private async processQueue(): Promise<void> {
+    if (this.isProcessing) return;
+    this.isProcessing = true;
+    try {
+      while (this.eventQueue.length > 0) {
+        const event = this.eventQueue.shift();
+        if (event) {
+          await this.handleTokenAccountChange(event);
+        }
+      }
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+
   private async handleTokenAccountChange(keyedAccountInfo: KeyedAccountInfo): Promise<void> {
     try {
       const accountData = keyedAccountInfo.accountInfo.data;
       if (!accountData || accountData.length < 165) return;
       const mintBytes = accountData.slice(0, 32);
       const ownerBytes = accountData.slice(32, 64);
-      const amountBytes = accountData.slice(64, 72);
       const mint = new PublicKey(mintBytes).toBase58();
       const owner = new PublicKey(ownerBytes).toBase58();
       const amount = Number(accountData.readBigUInt64LE(64));
+
+      // We already filtered by tracked mints, so just find the market
       const market = await this.prisma.market.findFirst({
         where: {
           OR: [{ yesTokenMint: mint }, { noTokenMint: mint }],
