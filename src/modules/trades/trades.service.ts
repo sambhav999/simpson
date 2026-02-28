@@ -35,9 +35,11 @@ export class TradesService {
       throw new AppError(`Market ${params.marketId} is not active`, 400);
     }
     const tokenMint = params.side === 'YES' ? market.yesTokenMint : market.noTokenMint;
-    if (!this.solana.validatePublicKey(tokenMint)) {
-      throw new AppError('Market has invalid token mint configuration', 500);
-    }
+
+    // Skip Solana public key validation for tokenMint because Polymarket IDs are large strings, not Solana keys.
+    // if (!this.solana.validatePublicKey(tokenMint)) {
+    //   throw new AppError('Market has invalid token mint configuration', 500);
+    // }
     const quoteParams: TradeQuoteParams = {
       wallet: params.wallet,
       marketId: market.externalId || params.marketId,
