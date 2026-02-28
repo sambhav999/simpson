@@ -43,8 +43,13 @@ export class SolanaListener {
     });
 
     for (const market of markets) {
-      await this.indexTransactionsForMint(market.yesTokenMint, state.lastSignature);
-      await this.indexTransactionsForMint(market.noTokenMint, state.lastSignature);
+      // Skip markets with placeholder/invalid Solana public keys
+      if (this.solana.validatePublicKey(market.yesTokenMint)) {
+        await this.indexTransactionsForMint(market.yesTokenMint, state.lastSignature);
+      }
+      if (this.solana.validatePublicKey(market.noTokenMint)) {
+        await this.indexTransactionsForMint(market.noTokenMint, state.lastSignature);
+      }
     }
   }
 
