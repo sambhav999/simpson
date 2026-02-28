@@ -18,6 +18,9 @@ import { errorHandler } from './core/config/error.handler';
 export function buildApp() {
     const app = express();
 
+    // Trust proxy (required behind load balancers like DigitalOcean/Render)
+    app.set('trust proxy', 1);
+
     app.use(helmet());
     app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }));
     app.use(compression());
