@@ -834,13 +834,20 @@
   cursor: not-allowed;
 }
 
-/* ===== QUOTE RESULT ===== */
+/* ===== QUOTE RESULT & CONFIRMATION ===== */
 .quote-result {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 1.25rem;
   animation: fadeIn 0.3s ease;
+}
+
+.quote-result.large {
+  padding: 1.5rem;
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.05);
+  margin-bottom: 1rem;
 }
 
 .quote-result h4 {
@@ -869,6 +876,103 @@
   font-weight: 600;
 }
 
+.quote-row.total {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+}
+
+.quote-row.total span:last-child {
+  color: var(--accent-green);
+  font-size: 1.1rem;
+}
+
+.side-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.side-badge.yes {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-green);
+}
+
+.side-badge.no {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-red);
+}
+
+.quote-confirmation {
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.3s ease;
+}
+
+.back-btn {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 0 0 1rem 0;
+  cursor: pointer;
+  transition: color var(--transition);
+}
+
+.back-btn:hover {
+  color: var(--text-primary);
+}
+
+.confirm-btn {
+  padding: 14px;
+  background: var(--accent-green);
+  color: #000;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.confirm-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 30px rgba(16, 185, 129, 0.3);
+}
+
+.confirm-btn.loading {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: wait;
+}
+
+.confirm-btn.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(300%);
+  }
+}
+
 .quote-error {
   color: var(--accent-red);
   font-size: 0.85rem;
@@ -876,7 +980,58 @@
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: var(--radius-md);
+  margin-bottom: 1rem;
   animation: fadeIn 0.3s ease;
+}
+
+/* ===== SUCCESS STATE ===== */
+.trade-success-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.success-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+
+  40% {
+    transform: translateY(-15px);
+  }
+
+  60% {
+    transform: translateY(-7px);
+  }
+}
+
+.trade-success-state h3 {
+  font-size: 1.5rem;
+  color: var(--accent-green);
+  margin-bottom: 0.5rem;
+}
+
+.trade-success-state p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.success-market-title {
+  font-weight: 600;
+  color: var(--text-primary) !important;
+  margin-bottom: 2rem !important;
 }
 
 /* ===== RESPONSIVE ===== */

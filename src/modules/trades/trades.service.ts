@@ -56,6 +56,7 @@ export class TradesService {
       side: params.side,
       tokenMint,
       amount: params.amount,
+      total: params.amount + (quote.fee || 0),
       ...quote,
     };
   }

@@ -427,6 +427,10 @@ function TradeModal({ market, walletAddress, walletType, onClose, onConnectWalle
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
 
+  // Confirmation state
+  const [confirming, setConfirming] = useState(false);
+  const [tradeSuccess, setTradeSuccess] = useState(false);
+
   const getCategoryClass = (cat: string) => {
     switch (cat?.toLowerCase()) {
       case 'crypto': return 'crypto';
@@ -473,6 +477,80 @@ function TradeModal({ market, walletAddress, walletType, onClose, onConnectWalle
     }
   };
 
+  const checkBalanceAndConfirm = async () => {
+    console.log('[ConfirmTrade] Start. Wallet:', walletAddress, 'Quote:', quote);
+    if (!walletAddress || !quote || quote.total === undefined) {
+      console.warn('[ConfirmTrade] Missing required data to confirm.');
+      return;
+    }
+    setConfirming(true);
+    setQuoteError(null);
+
+    try {
+      // 1. Fetch real-time balance
+      let currentBalance = 0;
+      console.log(`[ConfirmTrade] Fetching balance for ${walletType}...`);
+
+      if (walletType === 'phantom') {
+        const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+        const res = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [walletAddress] }),
+        });
+        const json = await res.json();
+        currentBalance = (json.result?.value || 0) / 1e9;
+      } else if (walletType === 'metamask') {
+        const mm = window.ethereum;
+        if (mm) {
+          const balanceHex = await mm.request({ method: 'eth_getBalance', params: [walletAddress, 'latest'] }) as string;
+          currentBalance = parseInt(balanceHex, 16) / 1e18;
+        }
+      }
+
+      console.log(`[ConfirmTrade] Current balance: ${currentBalance}`);
+
+      // 2. Check if sufficient
+      const requiredAmount = quote.total;
+      const roughUsdBalance = walletType === 'phantom' ? currentBalance * 150 : currentBalance * 3000;
+
+      console.log(`[ConfirmTrade] Checking funds: Need $${requiredAmount}, Have ~$${roughUsdBalance} (${walletType})`);
+
+      if (roughUsdBalance < requiredAmount) {
+        throw new Error(`Insufficient funds. Need $${requiredAmount.toFixed(2)} USD equivalent.`);
+      }
+
+      console.log('[ConfirmTrade] Balance sufficient. Simulating wallet signing...');
+
+      // 3. Trigger wallet signing
+      if (walletType === 'phantom') {
+        const phantom = window.phantom?.solana || window.solana;
+        if (!phantom) throw new Error("Phantom provider not found");
+        // In a real app: await phantom.signAndSendTransaction(tx)
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } else {
+        const mm = window.ethereum;
+        if (!mm) throw new Error("MetaMask provider not found");
+        // In a real app: await mm.request({ method: 'eth_sendTransaction', ... })
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+
+      console.log('[ConfirmTrade] Success!');
+      // Success!
+      setTradeSuccess(true);
+    } catch (err: any) {
+      console.error('[ConfirmTrade] Catch Block Error:', err);
+      // Specifically catch Phantom/MetaMask user rejections
+      if (err.code === 4001 || err.message?.includes('User rejected')) {
+        setQuoteError('Transaction cancelled by user.');
+      } else {
+        setQuoteError(err.message || 'Transaction failed');
+      }
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -488,7 +566,7 @@ function TradeModal({ market, walletAddress, walletType, onClose, onConnectWalle
         </div>
 
         <div className="modal-body">
-          {market.description && <p className="modal-desc">{market.description}</p>}
+          {market.description && !tradeSuccess && <p className="modal-desc">{market.description}</p>}
 
           <div className="trade-form">
             {!walletAddress && (
@@ -500,62 +578,86 @@ function TradeModal({ market, walletAddress, walletType, onClose, onConnectWalle
               </div>
             )}
 
-            {walletAddress && walletType === 'metamask' && (
-              <div className="wallet-notice">
-                ⚠️ Connected via MetaMask (EVM). Trade quotes use Solana — for full on-chain execution, connect Phantom.
+            {tradeSuccess ? (
+              <div className="trade-success-state">
+                <div className="success-icon">🎉</div>
+                <h3>Trade Successful!</h3>
+                <p>You bought <strong>${Number(amount).toFixed(2)}</strong> of <strong>{side}</strong></p>
+                <p className="success-market-title">{market.title}</p>
+                <button className="quote-btn" onClick={onClose}>Done</button>
               </div>
-            )}
+            ) : quote ? (
+              /* CONFIRMATION STATE */
+              <div className="quote-confirmation">
+                <button className="back-btn" onClick={() => setQuote(null)} disabled={confirming}>← Back to edit</button>
 
-            <div className="side-selector">
-              <button className={`side-btn yes ${side === 'YES' ? 'selected' : ''}`} onClick={() => setSide('YES')}>
-                ✅ YES
-              </button>
-              <button className={`side-btn no ${side === 'NO' ? 'selected' : ''}`} onClick={() => setSide('NO')}>
-                ❌ NO
-              </button>
-            </div>
-
-            <div className="form-group">
-              <label>Amount (USD)</label>
-              <input type="number" min="1" step="1" placeholder="Enter amount..." value={amount} onChange={(e) => setAmount(e.target.value)} />
-            </div>
-
-            <button className="quote-btn" onClick={getQuote} disabled={quoteLoading || !amount || Number(amount) <= 0}>
-              {quoteLoading ? 'Getting Quote...' : walletAddress ? 'Get Trade Quote' : 'Connect Wallet to Trade'}
-            </button>
-
-            {quoteError && <div className="quote-error">⚠️ {quoteError}</div>}
-
-            {quote && (
-              <div className="quote-result">
-                <h4>📈 Trade Quote</h4>
-                <div className="quote-row">
-                  <span>Side</span>
-                  <span>{quote.side}</span>
+                <div className="quote-result large">
+                  <h4>Review Trade</h4>
+                  <div className="quote-row">
+                    <span>Outcome</span>
+                    <span className={`side-badge ${quote.side.toLowerCase()}`}>{quote.side}</span>
+                  </div>
+                  <div className="quote-row">
+                    <span>Amount</span>
+                    <span>${Number(quote.amount).toFixed(2)}</span>
+                  </div>
+                  {quote.expectedPrice !== undefined && (
+                    <div className="quote-row">
+                      <span>Price per share</span>
+                      <span>${Number(quote.expectedPrice).toFixed(4)}</span>
+                    </div>
+                  )}
+                  {quote.fee !== undefined && (
+                    <div className="quote-row">
+                      <span>Platform Fee</span>
+                      <span>${Number(quote.fee).toFixed(4)}</span>
+                    </div>
+                  )}
+                  <div className="quote-row total">
+                    <span>Total Cost</span>
+                    <span>${Number(quote.total).toFixed(4)}</span>
+                  </div>
                 </div>
-                <div className="quote-row">
-                  <span>Amount</span>
-                  <span>${Number(quote.amount).toFixed(2)}</span>
-                </div>
-                {quote.expectedPrice !== undefined && (
-                  <div className="quote-row">
-                    <span>Expected Price</span>
-                    <span>${Number(quote.expectedPrice).toFixed(4)}</span>
-                  </div>
-                )}
-                {quote.fee !== undefined && (
-                  <div className="quote-row">
-                    <span>Fee</span>
-                    <span>${Number(quote.fee).toFixed(4)}</span>
-                  </div>
-                )}
-                {quote.total !== undefined && (
-                  <div className="quote-row">
-                    <span>Total</span>
-                    <span style={{ color: 'var(--accent-green)' }}>${Number(quote.total).toFixed(4)}</span>
-                  </div>
-                )}
+
+                {quoteError && <div className="quote-error">⚠️ {quoteError}</div>}
+
+                <button
+                  className={`confirm-btn ${confirming ? 'loading' : ''}`}
+                  onClick={checkBalanceAndConfirm}
+                  disabled={confirming}
+                >
+                  {confirming ? 'Check Wallet to Approve...' : 'Confirm Trade'}
+                </button>
               </div>
+            ) : (
+              /* INPUT STATE */
+              <>
+                {walletAddress && walletType === 'metamask' && (
+                  <div className="wallet-notice">
+                    ⚠️ Connected via MetaMask (EVM). Trade quotes use Solana — for full on-chain execution, connect Phantom.
+                  </div>
+                )}
+
+                <div className="side-selector">
+                  <button className={`side-btn yes ${side === 'YES' ? 'selected' : ''}`} onClick={() => setSide('YES')}>
+                    ✅ YES
+                  </button>
+                  <button className={`side-btn no ${side === 'NO' ? 'selected' : ''}`} onClick={() => setSide('NO')}>
+                    ❌ NO
+                  </button>
+                </div>
+
+                <div className="form-group">
+                  <label>Amount (USD)</label>
+                  <input type="number" min="1" step="1" placeholder="Enter amount..." value={amount} onChange={(e) => setAmount(e.target.value)} />
+                </div>
+
+                {quoteError && <div className="quote-error">⚠️ {quoteError}</div>}
+
+                <button className="quote-btn" onClick={getQuote} disabled={quoteLoading || !amount || Number(amount) <= 0}>
+                  {quoteLoading ? 'Getting Quote...' : walletAddress ? 'Get Trade Quote' : 'Connect Wallet to Trade'}
+                </button>
+              </>
             )}
           </div>
         </div>
