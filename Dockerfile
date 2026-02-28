@@ -37,4 +37,4 @@ USER node
 EXPOSE 3000
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/main.js"]
