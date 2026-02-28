@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(dir /s /b /ad \"C:\\\\Users\\\\RENTKAR\\\\Desktop\\\\SimpPredictDflow\\\\Backend\")",
+      "Bash(powershell -Command:*)",
+      "Bash(python3:*)",
+      "Bash(node:*)",
+      "Bash(powershell.exe -NoProfile -Command \"Write-Host ''PS test OK''\")",
+      "Bash(powershell.exe -NoProfile -Command \"\n$file = ''C:\\\\Users\\\\RENTKAR\\\\Desktop\\\\SimpPredictDflow\\\\Backend\\\\src\\\\modules\\\\solana\\\\solana.service.ts''\n$content = ''test content line 1'' + \\\\`n + ''test content line 2''\n[System.IO.File]::WriteAllText\\($file, $content, [System.Text.Encoding]::UTF8\\)\nWrite-Host ''Test file written''\nGet-Content $file\n\")",
+      "Bash(powershell.exe -NoProfile -Command \"[System.IO.File]::WriteAllText\\(''C:\\\\Users\\\\RENTKAR\\\\Desktop\\\\SimpPredictDflow\\\\Backend\\\\src\\\\modules\\\\solana\\\\solana.service.ts'', ''test line 1\\\\ntest line 2'', [System.Text.Encoding]::UTF8\\); Write-Host ''written''\")",
+      "Bash(powershell.exe -NoProfile:*)",
+      "Bash(powershell.exe -Command \"\n$content = @''\n# Build stage\nFROM node:20-alpine AS builder\n\nWORKDIR /app\n\nCOPY package*.json ./\nRUN npm ci --only=production=false\n\nCOPY tsconfig.json ./\nCOPY prisma ./prisma/\nCOPY src ./src/\n\nRUN npx prisma generate\nRUN npm run build\n\n# Production stage\nFROM node:20-alpine AS production\n\nWORKDIR /app\n\nRUN addgroup -S simpredict && adduser -S simpredict -G simpredict\n\nCOPY package*.json ./\nRUN npm ci --only=production && npm cache clean --force\n\nCOPY --from=builder /app/dist ./dist\nCOPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma\nCOPY prisma ./prisma/\n\nRUN mkdir -p logs && chown -R simpredict:simpredict /app\nUSER simpredict\n\nEXPOSE 3000\n\nHEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \\\\`\n  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1\n\nCMD [\"\"node\"\", \"\"dist/main.js\"\"]\n''@\nSet-Content -Path ''C:\\\\Users\\\\RENTKAR\\\\Desktop\\\\SimpPredictDflow\\\\Backend\\\\Dockerfile'' -Value $content -Encoding UTF8\nWrite-Host ''Dockerfile written.''\n\")",
+      "Bash(powershell.exe -NonInteractive -Command:*)",
+      "Bash(/tmp/write_files.ps1:*)",
+      "Bash(printf '%s' '# FILE 1: Dockerfile\n$dockerfile = @'\"''\"'\n# Build stage\nFROM node:20-alpine AS builder\n\nWORKDIR /app\n\nCOPY package*.json ./\nRUN npm ci --only=production=false\n\nCOPY tsconfig.json ./\nCOPY prisma ./prisma/\nCOPY src ./src/\n\nRUN npx prisma generate\nRUN npm run build\n\n# Production stage\nFROM node:20-alpine AS production\n\nWORKDIR /app\n\nRUN addgroup -S simpredict && adduser -S simpredict -G simpredict\n\nCOPY package*.json ./\nRUN npm ci --only=production && npm cache clean --force\n\nCOPY --from=builder /app/dist ./dist\nCOPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma\nCOPY prisma ./prisma/\n\nRUN mkdir -p logs && chown -R simpredict:simpredict /app\nUSER simpredict\n\nEXPOSE 3000\n\nHEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1\n\nCMD [\"\"node\"\", \"\"dist/main.js\"\"]\n'\"''\"'\nSet-Content -Path \"\"C:\\\\Users\\\\RENTKAR\\\\Desktop\\\\SimpPredictDflow\\\\Backend\\\\Dockerfile\"\" -Value $dockerfile -Encoding UTF8\nWrite-Host \"\"Dockerfile written.\"\"\n')",
+      "Bash(python:*)",
+      "Bash(py -c:*)",
+      "Bash(where:*)",
+      "Bash(/tmp/write_files.js:*)"
+    ]
+  }
+}

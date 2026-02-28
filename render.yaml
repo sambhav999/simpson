@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: simpredict-backend
+    env: node
+    region: fra
+    plan: starter
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: LOG_LEVEL
+        value: info
+      - key: SOLANA_NETWORK
+        value: mainnet-beta
+      - key: DATABASE_URL
+        fromDatabase:
+          name: simpredict-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: simpredict-redis
+          type: redis
+          property: connectionString
+      - key: HELIUS_RPC_URL
+        sync: false
+      - key: LIMITLESS_API_URL
+        value: https://api.limitless.exchange
+      - key: MYRIAD_API_URL
+        value: https://api.myriad.markets
+      - key: POLYMARKET_API_URL
+        value: https://gamma-api.polymarket.com
+
+databases:
+  - name: simpredict-db
+    databaseName: simpredict
+    user: simpredict
+    plan: starter
+
+  - name: simpredict-redis
+    type: redis
+    plan: starter
+    ipAllowList: []

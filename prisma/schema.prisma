@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  walletAddress String         @id @map("wallet_address")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  currentStreak Int            @default(0) @map("current_streak")
+  highestStreak Int            @default(0) @map("highest_streak")
+  lastTradeDate DateTime?      @map("last_trade_date")
+  avatarUrl     String?        @map("avatar_url")
+  username      String?        @unique
+  leaderboards  Leaderboard[]
+  points        Points?
+  pointsLedger  PointsLedger[]
+  positions     Position[]
+  trades        Trade[]
+
+  @@map("users")
+}
+
+model Market {
+  id               String            @id @default(cuid())
+  title            String
+  description      String            @default("")
+  yesTokenMint     String            @map("yes_token_mint")
+  noTokenMint      String            @map("no_token_mint")
+  expiry           DateTime?
+  status           String            @default("active")
+  category         String            @default("general")
+  externalId       String?           @unique @map("external_id")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  divergenceScore  Float             @default(0) @map("divergence_score")
+  oraclePrice      Float?            @map("oracle_price")
+  positions        Position[]
+  protocolRevenues ProtocolRevenue[]
+  trades           Trade[]
+
+  @@index([status])
+  @@index([category])
+  @@index([yesTokenMint])
+  @@index([noTokenMint])
+  @@map("markets")
+}
+
+model Position {
+  id                String   @id @default(cuid())
+  walletAddress     String   @map("wallet_address")
+  marketId          String   @map("market_id")
+  tokenMint         String   @map("token_mint")
+  amount            Float    @default(0)
+  averageEntryPrice Float    @default(0) @map("average_entry_price")
+  realizedPnl       Float    @default(0) @map("realized_pnl")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  market            Market   @relation(fields: [marketId], references: [id])
+  user              User     @relation(fields: [walletAddress], references: [walletAddress])
+
+  @@unique([walletAddress, marketId, tokenMint])
+  @@index([walletAddress])
+  @@index([marketId])
+  @@map("positions")
+}
+
+model Trade {
+  id            String   @id @default(cuid())
+  walletAddress String   @map("wallet_address")
+  marketId      String   @map("market_id")
+  tokenMint     String   @map("token_mint")
+  side          String
+  price         Float
+  amount        Float
+  fee           Float    @default(0)
+  signature     String   @unique
+  timestamp     DateTime
+  createdAt     DateTime @default(now()) @map("created_at")
+  market        Market   @relation(fields: [marketId], references: [id])
+  user          User     @relation(fields: [walletAddress], references: [walletAddress])
+
+  @@index([walletAddress])
+  @@index([marketId])
+  @@index([signature])
+  @@index([timestamp])
+  @@map("trades")
+}
+
+model Leaderboard {
+  walletAddress String   @map("wallet_address")
+  totalVolume   Float    @default(0) @map("total_volume")
+  totalPnl      Float    @default(0) @map("total_pnl")
+  winRate       Float    @default(0) @map("win_rate")
+  tradeCount    Int      @default(0) @map("trade_count")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  period        String   @default("ALL_TIME")
+  user          User     @relation(fields: [walletAddress], references: [walletAddress])
+
+  @@unique([walletAddress, period])
+  @@index([totalPnl])
+  @@index([totalVolume])
+  @@map("leaderboard")
+}
+
+model ProtocolRevenue {
+  id          String   @id @default(cuid())
+  marketId    String   @map("market_id")
+  amount      Float    @default(0)
+  assetMint   String   @map("asset_mint")
+  collectedAt DateTime @default(now()) @map("collected_at")
+  market      Market   @relation(fields: [marketId], references: [id])
+
+  @@index([marketId])
+  @@index([assetMint])
+  @@map("protocol_revenue")
+}
+
+model Points {
+  walletAddress String   @id @map("wallet_address")
+  balance       Int      @default(0)
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [walletAddress], references: [walletAddress])
+
+  @@index([balance])
+  @@map("points")
+}
+
+model PointsLedger {
+  id            String   @id @default(cuid())
+  walletAddress String   @map("wallet_address")
+  amount        Int
+  reason        String
+  createdAt     DateTime @default(now()) @map("created_at")
+  user          User     @relation(fields: [walletAddress], references: [walletAddress])
+
+  @@index([walletAddress])
+  @@map("points_ledger")
+}
+
+model IndexerState {
+  id            String   @id @default("singleton")
+  lastSignature String?  @map("last_signature")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("indexer_state")
+}
