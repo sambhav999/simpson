@@ -8,6 +8,7 @@ export interface LeaderboardEntry {
   totalPnl: number;
   winRate: number;
   tradeCount: number;
+  highestStreak: number;
 }
 export class LeaderboardService {
   private readonly prisma: PrismaService;
@@ -24,14 +25,21 @@ export class LeaderboardService {
     const cacheKey = `${this.CACHE_KEY}:${page}:${limit}:${sortBy}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
-    const validSortFields = ['totalPnl', 'totalVolume', 'winRate', 'tradeCount'];
+    const validSortFields = ['totalPnl', 'totalVolume', 'winRate', 'tradeCount', 'streak'];
     const orderField = validSortFields.includes(sortBy) ? sortBy : 'totalPnl';
+
+    // Support relation sorting for streak
+    const prismaOrder = sortBy === 'streak'
+      ? { user: { highestStreak: 'desc' as const } }
+      : { [orderField]: 'desc' as const };
+
     const skip = (page - 1) * limit;
     const [entries, total] = await Promise.all([
       this.prisma.leaderboard.findMany({
         skip,
         take: limit,
-        orderBy: { [orderField]: 'desc' },
+        orderBy: prismaOrder,
+        include: { user: true },
       }),
       this.prisma.leaderboard.count(),
     ]);
@@ -42,6 +50,7 @@ export class LeaderboardService {
       totalPnl: entry.totalPnl,
       winRate: entry.winRate,
       tradeCount: entry.tradeCount,
+      highestStreak: (entry as any).user?.highestStreak || 0,
     }));
     const result = {
       data: ranked,

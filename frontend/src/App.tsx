@@ -376,7 +376,7 @@ function App() {
       )}
 
       {currentView === 'leaderboard' && (
-        <LeaderboardView />
+        <LeaderboardView walletAddress={walletAddress} />
       )}
 
       {/* Trade Modal */}
@@ -861,7 +861,7 @@ function PortfolioView({ walletAddress, onConnectWallet }: { walletAddress: stri
 }
 
 /* ===== Leaderboard View Component ===== */
-function LeaderboardView() {
+function LeaderboardView({ walletAddress }: { walletAddress: string | null }) {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'volume' | 'streak'>('volume');
@@ -922,29 +922,34 @@ function LeaderboardView() {
               </tr>
             </thead>
             <tbody>
-              {data.map((user: any, index: number) => (
-                <tr key={index} style={{ borderBottom: '1px solid var(--border)', transition: 'background var(--transition)' }} onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-card-hover)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '1.25rem 1.5rem', fontWeight: 'bold', color: index < 3 ? 'var(--accent-yellow)' : 'var(--text-secondary)' }}>
-                    {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
-                  </td>
-                  <td style={{ padding: '1.25rem 1.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>
-                        {user.walletAddress.substring(2, 4).toUpperCase()}
+              {data.map((user: any, index: number) => {
+                const isMe = walletAddress && user.walletAddress === walletAddress;
+                return (
+                  <tr key={user.walletAddress} style={{ borderBottom: '1px solid var(--border)', transition: 'background var(--transition)', background: isMe ? 'rgba(59, 130, 246, 0.1)' : 'transparent' }} onMouseEnter={(e) => !isMe && (e.currentTarget.style.background = 'var(--bg-card-hover)')} onMouseLeave={(e) => !isMe && (e.currentTarget.style.background = 'transparent')}>
+                    <td style={{ padding: '1.25rem 1.5rem', fontWeight: 'bold', color: index < 3 ? 'var(--accent-yellow)' : 'var(--text-secondary)' }}>
+                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', color: 'white' }}>
+                          {user.walletAddress.substring(2, 4).toUpperCase()}
+                        </div>
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.95rem', color: isMe ? 'var(--accent-blue)' : 'inherit' }}>
+                          {isMe ? `${user.walletAddress} (You)` : `${user.walletAddress.substring(0, 6)}...${user.walletAddress.substring(user.walletAddress.length - 4)}`}
+                        </span>
                       </div>
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.95rem' }}>{user.walletAddress.substring(0, 6)}...{user.walletAddress.substring(user.walletAddress.length - 4)}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-                    ${(user.totalVolume || 0).toFixed(2)}
-                  </td>
-                  <td style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>
-                    <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-yellow)', padding: '4px 12px', borderRadius: 'var(--radius-xl)', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                      🔥 {user.highestStreak || 0}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                      ${(user.totalVolume || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>
+                      <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-yellow)', padding: '4px 12px', borderRadius: 'var(--radius-xl)', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                        🔥 {user.highestStreak || 0}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
               {data.length === 0 && (
                 <tr>
                   <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
