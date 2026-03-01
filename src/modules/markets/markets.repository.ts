@@ -27,6 +27,7 @@ export class MarketsRepository {
         expiry: market.expiry ? new Date(market.expiry) : null,
         status: market.status,
         category: market.category,
+        image: market.image,
       },
       update: {
         title: market.title,
@@ -34,6 +35,7 @@ export class MarketsRepository {
         status: market.status,
         expiry: market.expiry ? new Date(market.expiry) : null,
         category: market.category,
+        image: market.image,
       },
     });
   }
@@ -49,7 +51,7 @@ export class MarketsRepository {
       if (!existing) {
         created++;
         changedIds.push(dbMarket.id);
-      } else if (existing.status !== market.status || existing.category !== market.category || existing.title !== market.title) {
+      } else if (existing.status !== market.status || existing.category !== market.category || existing.title !== market.title || existing.image !== market.image) {
         updated++;
         changedIds.push(dbMarket.id);
       }

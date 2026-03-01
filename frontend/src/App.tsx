@@ -20,6 +20,7 @@ interface Market {
   category: string;
   status: string;
   expiry: string | null;
+  image?: string; // Added as per instruction
   divergenceScore?: number;
   oraclePrice?: number | null;
 }
@@ -332,14 +333,27 @@ function App() {
               <div className="markets-grid">
                 {markets.map((market) => (
                   <div key={market.id} className="market-card" onClick={() => setSelectedMarket(market)}>
-                    <div className="card-header">
-                      <span className={`category-tag ${getCategoryClass(market.category)}`}>
-                        {market.category}
-                      </span>
-                      <span className={`status-badge ${market.status.toLowerCase()}`}>
-                        {market.status}
-                      </span>
-                    </div>
+                    {market.image ? (
+                      <div className="market-image" style={{ backgroundImage: `url(${market.image})` }}>
+                        <div className="card-header overlaid">
+                          <span className={`category-tag ${getCategoryClass(market.category)}`}>
+                            {market.category}
+                          </span>
+                          <span className={`status-badge ${market.status.toLowerCase()}`}>
+                            {market.status}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="card-header">
+                        <span className={`category-tag ${getCategoryClass(market.category)}`}>
+                          {market.category}
+                        </span>
+                        <span className={`status-badge ${market.status.toLowerCase()}`}>
+                          {market.status}
+                        </span>
+                      </div>
+                    )}
                     <h3 className="card-title">{market.title}</h3>
                     <p className="card-desc">{market.description}</p>
                     <div className="card-footer">

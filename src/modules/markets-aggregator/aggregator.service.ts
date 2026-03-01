@@ -16,6 +16,7 @@ export interface DFlowMarket {
     status: string;
     category: string;
     source?: 'limitless' | 'myriad' | 'polymarket';
+    image?: string;
 }
 
 export interface TradeQuoteParams {
@@ -121,6 +122,7 @@ export class AggregatorService {
                     expiry: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
                     status: 'active',
                     category: 'Crypto',
+                    image: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=800&auto=format&fit=crop&q=60',
                 },
                 {
                     id: 'MOCK-BULL-BEAR-1',
@@ -131,6 +133,7 @@ export class AggregatorService {
                     expiry: new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString(),
                     status: 'active',
                     category: 'Finance',
+                    image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=60',
                 },
                 {
                     id: 'MOCK-FLIGHT-1',
@@ -141,6 +144,7 @@ export class AggregatorService {
                     expiry: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString(),
                     status: 'active',
                     category: 'Travel',
+                    image: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&auto=format&fit=crop&q=60',
                 },
                 {
                     id: 'MOCK-TECH-1',
@@ -151,6 +155,7 @@ export class AggregatorService {
                     expiry: '2026-07-01T00:00:00.000Z',
                     status: 'active',
                     category: 'Technology',
+                    image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&auto=format&fit=crop&q=60',
                 },
                 {
                     id: 'MOCK-SPORTS-1',
@@ -161,6 +166,7 @@ export class AggregatorService {
                     expiry: '2026-06-01T00:00:00.000Z',
                     status: 'active',
                     category: 'Sports',
+                    image: 'https://images.unsplash.com/photo-1504450758481-7338eba7524a?w=800&auto=format&fit=crop&q=60',
                 }
             ];
         } catch (err) { throw err; }
@@ -218,6 +224,7 @@ export class AggregatorService {
                             expiry: market.endDate || event.endDate || new Date(Date.now() + 86400000).toISOString(),
                             status: market.active ? 'active' : 'inactive',
                             category: (event.tags && event.tags.length > 0) ? event.tags[0].label || event.tags[0] : 'Polymarket',
+                            image: market.image || event.image || undefined,
                         });
                     }
                 }

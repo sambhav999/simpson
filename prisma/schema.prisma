@@ -39,6 +39,7 @@ model Market {
   updatedAt        DateTime          @updatedAt @map("updated_at")
   divergenceScore  Float             @default(0) @map("divergence_score")
   oraclePrice      Float?            @map("oracle_price")
+  image            String?           @map("image_url")
   positions        Position[]
   protocolRevenues ProtocolRevenue[]
   trades           Trade[]
