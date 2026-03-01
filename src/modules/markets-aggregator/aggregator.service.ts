@@ -224,7 +224,7 @@ export class AggregatorService {
                             expiry: market.endDate || event.endDate || new Date(Date.now() + 86400000).toISOString(),
                             status: market.active ? 'active' : 'inactive',
                             category: (event.tags && event.tags.length > 0) ? event.tags[0].label || event.tags[0] : 'Polymarket',
-                            image: market.image || event.image || undefined,
+                            image: market.image || market.icon || event.image || event.icon || undefined,
                         });
                     }
                 }
