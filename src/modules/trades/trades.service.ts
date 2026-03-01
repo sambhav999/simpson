@@ -4,6 +4,7 @@ import { SolanaService } from '../solana/solana.service';
 import { logger } from '../../core/logger/logger';
 import { AppError } from '../../core/config/error.handler';
 import { tradeQuotesRequested, tradesIndexedSuccessfully, indexerLagSeconds } from '../metrics/metrics.controller';
+import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 export class TradesService {
   private readonly aggregator: AggregatorService;
   private readonly prisma: PrismaService;
@@ -61,6 +62,78 @@ export class TradesService {
       ...quote,
     };
   }
+
+  getSolanaPayMetadata() {
+    return {
+      label: 'SimPredict Prediction Markets',
+      icon: 'https://simpredict.xyz/logo.png', // Fallback remote logo for Solana Pay wallets
+    };
+  }
+
+  async getSolanaPayTransaction(params: {
+    account: string;
+    marketId: string;
+    side: 'YES' | 'NO';
+    amount: number;
+    reference: string;
+  }) {
+    if (!this.solana.validatePublicKey(params.account)) {
+      throw new AppError('Invalid user account address', 400);
+    }
+
+    // 1. Fetch market and quote to get accurate pricing
+    const quote = await this.getTradeQuote({
+      wallet: params.account,
+      marketId: params.marketId,
+      side: params.side,
+      amount: params.amount
+    });
+
+    const userPubkey = new PublicKey(params.account);
+    const referencePubkey = new PublicKey(params.reference);
+
+    // 2. Build the actual transaction
+    // In a real production app, this would explicitly call the polymorphic contract (e.g., Polymarket's CTF exchange)
+    // For this example, we'll simulate the transaction building by creating a transfer to a treasury wallet
+    // but attaching the reference key so the indexer can track it.
+
+    const treasuryPubkey = new PublicKey(process.env.FEE_WALLET_ADDRESS || '11111111111111111111111111111111');
+    const lamports = Math.floor((quote.total || params.amount) * 1e9); // Convert simulated cost to lamports
+
+    const connection = this.solana.getConnection();
+    const { blockhash } = await connection.getLatestBlockhash('finalized');
+
+    const transaction = new Transaction({
+      recentBlockhash: blockhash,
+      feePayer: userPubkey,
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: userPubkey,
+        toPubkey: treasuryPubkey,
+        lamports,
+      })
+    );
+
+    // CRITICAL: Attach the reference address to the transaction so our system can look it up later
+    transaction.instructions[0].keys.push({
+      pubkey: referencePubkey,
+      isSigner: false,
+      isWritable: false,
+    });
+
+    // 3. Serialize the transaction as base64 and return
+    const serializedTransaction = transaction.serialize({
+      requireAllSignatures: false, // We only build it, the mobile wallet signs it
+    });
+
+    logger.info(`Solana Pay Transaction Request built for ${params.account} on market ${params.marketId}`);
+
+    return {
+      transaction: serializedTransaction.toString('base64'),
+      message: `Predict ${params.side} on Market`,
+    };
+  }
+
   async recordTrade(data: {
     walletAddress: string;
     marketId: string;
