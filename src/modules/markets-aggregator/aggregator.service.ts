@@ -291,7 +291,8 @@ export class AggregatorService {
     }
 
     private validateTradeParams(params: TradeQuoteParams): void {
-        if (!params.wallet || params.wallet.length < 32 || params.wallet.length > 44) {
+        const isValidLength = params.wallet.length === 42 || (params.wallet.length >= 32 && params.wallet.length <= 44);
+        if (!params.wallet || !isValidLength) {
             throw new AppError('Invalid wallet address', 400);
         }
         if (!params.marketId) {

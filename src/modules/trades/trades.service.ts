@@ -19,8 +19,9 @@ export class TradesService {
     side: 'YES' | 'NO';
     amount: number;
   }) {
-    if (!this.solana.validatePublicKey(params.wallet)) {
-      throw new AppError('Invalid wallet address', 400);
+    const isEthAddress = params.wallet.startsWith('0x') && params.wallet.length === 42;
+    if (!isEthAddress && !this.solana.validatePublicKey(params.wallet)) {
+      throw new AppError('Invalid wallet address (must be valid Solana or Ethereum address)', 400);
     }
     if (params.amount <= 0) {
       throw new AppError('Amount must be positive', 400);
