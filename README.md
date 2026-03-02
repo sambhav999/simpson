@@ -1,272 +1,146 @@
-# SimPredict Backend
+# SimPredict
 
-A production-ready, non-custodial prediction marketplace backend powered by Solana and DFlow Prediction Markets API.
+A comprehensive, production-ready prediction marketplace built with React, Node.js, Express, Prisma, and Solana.
+
+This application acts as a real-time aggregator for top prediction markets (such as Polymarket and Limitless), providing users a premium UI to browse events, track their portfolio, view global leaderboards, and execute seamless trades via Solana Pay QR codes or direct browser wallet integration.
+
+---
 
 ## Architecture Overview
 
+This project is a monorepo consisting of:
+1. **Frontend (`/frontend`)**: A React Single Page Application (SPA) styled with custom CSS and glassmorphism.
+2. **Backend (`/src`)**: A robust Node.js + Express API powered by Prisma (PostgreSQL) and Redis.
+
 ```
 simpredict-backend/
-├── src/
+├── frontend/                # React Vite Application
+│   ├── src/
+│   │   ├── App.tsx          # Main Views (Markets, Portfolio, Leaderboard)
+│   │   ├── main.tsx         # Entrypoint
+│   │   └── App.css          # Global Styles
+├── src/                     # Node.js REST API
 │   ├── core/
-│   │   ├── config/          # App config, Prisma client, Redis client, error handler
-│   │   └── logger/          # Winston logger
+│   │   └── config/          # Prisma & Redis singletons
 │   ├── modules/
-│   │   ├── markets/         # Market fetch, cache, REST endpoints
-│   │   ├── portfolio/       # User positions, trade history, wallet sync
-│   │   ├── trades/          # Trade quote via DFlow, trade recording
-│   │   ├── leaderboard/     # PnL ranking engine
-│   │   ├── dflow/           # DFlow Metadata + Trade API client
-│   │   └── solana/          # Solana RPC service + WebSocket listener
-│   ├── jobs/
-│   │   ├── market-sync.job.ts      # Syncs markets every 60s (BullMQ)
-│   │   └── portfolio-sync.job.ts   # Syncs positions every 30s (BullMQ)
-│   └── main.ts
+│   │   ├── markets-aggregator/ # Fetches from Polymarket, Limitless, Myriad
+│   │   ├── markets/         # Market service and DB repository
+│   │   ├── portfolio/       # Wallet positions and trades
+│   │   ├── leaderboard/     # Global PnL and Streak rankings
+│   │   └── trade/           # Solana Pay QR generation and execution parsing
+│   ├── jobs/                # Background BullMQ workers (Market Sync)
+│   └── main.ts              # Express Server Setup
 ├── prisma/
-│   └── schema.prisma
-├── Dockerfile
-├── docker-compose.yml
-└── .env.example
+│   └── schema.prisma        # Database Models (User, Market, Position, Trade...)
+└── .env                     # Configuration Secrets
 ```
 
-## Prerequisites
+---
 
-- Node.js 20+
-- PostgreSQL 14+
-- Redis 7+
-- A [Helius](https://helius.dev) account for Solana RPC access
-- DFlow API credentials
+## 🚀 Features
 
-## Environment Setup
+### Frontend (React UI)
+- **Markets View:** Browse dynamically synced prediction markets (Polymarket + Limitsless Mocks) with full-bleed premium cover images.
+- **Portfolio View:** Track active positions, overall PnL, Total Value, and recent trade history for connected wallets.
+- **Leaderboard View:** See top traders globally, sortable by Highest Streak and Total Volume. Connected user is dynamically highlighted!
+- **Solana Pay Integration:** Instantly generate dynamic Solana Pay QR Codes to seamlessly execute trades from a mobile phantom/solflare wallet!
+- **Browser Wallet Connect:** Connect Phantom or MetaMask natively to view tracked balances and history.
 
-```bash
-cp .env.example .env
+### Backend (Node + Express)
+- **Aggregator Service:** Reaches out to leading API providers to extract, normalize, and cache current prediction events, including their thumbnails and categories!
+- **Solana Pay API:** `GET /trade/pay` and `POST /trade/pay` endpoints that implement the official Solana Pay specification to facilitate secure, gasless signing flows.
+- **High-Performance Caching:** Upstash Redis provides lightning-fast Leaderboard sorting and Market querying.
+- **Prisma ORM:** PostgreSQL schema mapping users, streaks, trade ledgers, and indexer states.
+
+---
+
+## 🛠️ Environment Setup
+
+You need to define your environment variables in the root `.env` file for the backend.
+
+```env
+# Database
+DATABASE_URL=postgresql://user:pass@host:5432/simpredict
+
+# Redis
+REDIS_URL=rediss://default:pass@host:6379
+
+# Solana
+HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY
+SOLANA_NETWORK=mainnet-beta
+
+# Aggregator APIs
+LIMITLESS_API_URL="https://api.limitless.exchange"
+MYRIAD_API_URL="https://api.myriad.markets"
+POLYMARKET_API_URL="https://gamma-api.polymarket.com"
+
+# Server
+PORT=3000
+NODE_ENV=development
 ```
 
-Edit `.env` with your values:
+*(Note: The `frontend` directory also has its own `.env` file that points to the backend URL.)*
 
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string |
-| `HELIUS_RPC_URL` | Helius RPC URL with API key |
-| `SOLANA_NETWORK` | `mainnet-beta`, `devnet`, or `testnet` |
-| `DFLOW_METADATA_API` | DFlow markets metadata API base URL |
-| `DFLOW_TRADE_API` | DFlow trade execution API base URL |
-| `PORT` | Server port (default: 3000) |
+---
 
-### Helius RPC Setup
+## ⚙️ Running Locally
 
-1. Sign up at [helius.dev](https://helius.dev)
-2. Create a new project and copy your API key
-3. Set `HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY`
-
-### DFlow Integration
-
-1. Obtain your DFlow API credentials from [dflow.net](https://dflow.net)
-2. Set `DFLOW_METADATA_API` and `DFLOW_TRADE_API` in your `.env`
-3. The backend will auto-sync markets every 60 seconds
-
-## Running Locally
-
-### 1. Install dependencies
-
+### 1. Install Dependencies
+Install packages for both the backend and frontend:
 ```bash
+# Root (Backend)
 npm install
+
+# Frontend
+cd frontend
+npm install
+cd ..
 ```
 
-### 2. Generate Prisma client
-
+### 2. Prepare the Database (Backend)
+Push the Prisma Schema to your PostgreSQL instance:
 ```bash
-npm run prisma:generate
+npx prisma db push
+npx prisma generate
 ```
 
-### 3. Apply database schema
-
+### 3. Sync Markets (Backend)
+Manually trigger the aggregator to populate your database with images and markets:
 ```bash
-# Push schema directly (development)
-npm run prisma:push
-
-# Or run migrations (production)
-npm run prisma:migrate
+npx ts-node -e "import { MarketsService } from './src/modules/markets/markets.service'; async function run() { console.log('Syncing...'); const svc = new MarketsService(); await svc.syncMarketsFromAggregator(); process.exit(0); }; run();"
 ```
 
-### 4. Start development server
+### 4. Start the Application
+Run both the frontend and backend concurrently (in separate terminals):
 
+**Terminal 1 (Backend):**
 ```bash
 npm run start:dev
 ```
+*(Runs on `http://localhost:3000`)*
 
-The server starts on `http://localhost:3000`.
-
-Health check: `GET http://localhost:3000/health`
-
-## Running in Production (Docker)
-
-### 1. Build and start all services
-
+**Terminal 2 (Frontend React App):**
 ```bash
-docker-compose up -d --build
+cd frontend
+npm run dev
 ```
-
-This starts:
-- `postgres` — PostgreSQL 16 on port 5432
-- `redis` — Redis 7 on port 6379
-- `migrate` — Runs Prisma migrations automatically
-- `backend` — SimPredict API on port 3000
-
-### 2. View logs
-
-```bash
-docker-compose logs -f backend
-```
-
-### 3. Stop services
-
-```bash
-docker-compose down
-```
-
-### 4. Stop and remove volumes (full reset)
-
-```bash
-docker-compose down -v
-```
-
-## API Reference
-
-### Markets
-
-#### `GET /markets`
-Returns paginated list of all prediction markets.
-
-Query params: `status`, `category`, `search`, `page`, `limit`
-
-```json
-{
-  "data": [...],
-  "pagination": { "page": 1, "limit": 20, "total": 100, "totalPages": 5 }
-}
-```
-
-#### `GET /markets/:id`
-Returns a single market by internal ID.
+*(Runs on `http://localhost:5173`)*
 
 ---
 
-### Portfolio
+## 📡 Core API Reference
 
-#### `GET /portfolio/:wallet`
-Returns all active positions for a wallet.
+### Markets & UI
+- `GET /markets`: Returns paginated lists of actively aggregated markets, formatted with `image`, `expiry`, and `category`.
+- `GET /portfolio/:wallet`: Returns the active PnL and Token Values tracking the provided Solana Wallet.
+- `GET /portfolio/:wallet/history`: Returns chronological trades.
+- `GET /leaderboard`: Returns top trader wallet addresses sorted by `totalVolume`, `streak`, or `totalPnl`.
 
-```json
-{
-  "data": {
-    "walletAddress": "...",
-    "totalPositions": 3,
-    "totalValue": 150.5,
-    "totalRealizedPnl": 12.4,
-    "positions": [...]
-  }
-}
-```
-
-#### `GET /portfolio/:wallet/history`
-Returns paginated trade history for a wallet.
-
-Query params: `page`, `limit`, `marketId`
+### Solana Pay (Trade)
+When a user clicks "Trade", the frontend queries the Solana Pay protocol:
+- **Phase 1** `GET /trade/pay?marketId=123&wallet=abc&side=YES&amount=10`
+  *Returns the required `label` and `icon` for the wallet UI.*
+- **Phase 2** `POST /trade/pay?marketId=123&wallet=abc&side=YES&amount=10`
+  *The mobile wallet posts the public key; the backend returns a serialized base64 Solana Transaction for the user to sign!*
 
 ---
-
-### Leaderboard
-
-#### `GET /leaderboard`
-Returns ranked users by PnL, volume, or win rate.
-
-Query params: `page`, `limit`, `sortBy` (`totalPnl` | `totalVolume` | `winRate` | `tradeCount`)
-
----
-
-### Trade
-
-#### `POST /trade/quote`
-Fetches a serialized trade transaction from DFlow. The user signs and submits this transaction client-side — **no funds are custodied by this backend**.
-
-Request body:
-```json
-{
-  "wallet": "<solana-wallet-address>",
-  "marketId": "<internal-market-id>",
-  "side": "YES",
-  "amount": 10
-}
-```
-
-Response:
-```json
-{
-  "data": {
-    "marketId": "...",
-    "marketTitle": "...",
-    "side": "YES",
-    "tokenMint": "...",
-    "amount": 10,
-    "serializedTransaction": "<base64>",
-    "expectedPrice": 0.65,
-    "priceImpact": 0.002,
-    "fee": 0.001,
-    "expiresAt": 1700000000
-  }
-}
-```
-
-## Background Jobs
-
-| Job | Interval | Description |
-|---|---|---|
-| `MarketSyncJob` | 60 seconds | Fetches and upserts markets from DFlow |
-| `PortfolioSyncJob` | 30 seconds | Syncs token balances for tracked wallets |
-| `LeaderboardUpdate` | 5 minutes | Recalculates PnL and rankings |
-
-Jobs use BullMQ with Redis as the queue backend. They are fault-tolerant with retry logic.
-
-## Solana Integration
-
-- **RPC**: Connects to Helius with confirmed commitment and automatic retry
-- **WebSocket listener**: Subscribes to SPL Token program account changes for active market token mints
-- **Token balances**: Fetched via `getParsedTokenAccountsByOwner`
-- **Transaction indexing**: Parses SPL token transfers and links them to known markets
-- **Deduplication**: Trades are indexed by transaction signature — no duplicates
-
-## Security Notes
-
-- No private keys are stored or used
-- All trades are signed by the user's wallet client-side
-- Token mint addresses are validated as valid Solana public keys
-- Rate limiting: 100 req/min per IP
-- Helmet.js for HTTP security headers
-- All inputs validated before processing
-
-## Database Indexes
-
-The schema includes indexes on:
-- `markets(status)`, `markets(category)`, `markets(yesTokenMint)`, `markets(noTokenMint)`
-- `positions(walletAddress)`, `positions(marketId)`
-- `trades(walletAddress)`, `trades(marketId)`, `trades(signature)`, `trades(timestamp)`
-- `leaderboard(totalPnl)`, `leaderboard(totalVolume)`
-
-## Prisma Commands
-
-```bash
-# Generate client after schema changes
-npm run prisma:generate
-
-# Apply migrations in production
-npm run prisma:migrate
-
-# Open Prisma Studio (DB GUI)
-npm run prisma:studio
-
-# Push schema without migrations (dev only)
-npm run prisma:push
-```
-# simpson
