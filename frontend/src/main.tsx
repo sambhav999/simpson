@@ -13,7 +13,7 @@ import { initialize } from '@solflare-wallet/metamask-wallet-standard';
 initialize();
 
 const RootApp = () => {
-  const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+  const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter(),

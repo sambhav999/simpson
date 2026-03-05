@@ -15,7 +15,7 @@ services:
       - key: LOG_LEVEL
         value: info
       - key: SOLANA_NETWORK
-        value: mainnet-beta
+        value: devnet
       - key: DATABASE_URL
         fromDatabase:
           name: simpredict-db

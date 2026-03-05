@@ -490,7 +490,7 @@ function TradeModal({ market, walletAddress, walletType, onClose, onConnectWalle
       console.log(`[ConfirmTrade] Fetching balance for ${walletType}...`);
 
       if (walletType === 'phantom') {
-        const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+        const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
         const res = await fetch(rpcUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -856,7 +856,7 @@ function PortfolioView({ walletAddress, onConnectWallet }: { walletAddress: stri
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <a href={`https://explorer.solana.com/tx/${trade.signature}?cluster=mainnet-beta`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)', fontSize: '0.85rem', textDecoration: 'none' }}>View Tx ↗</a>
+                      <a href={`https://explorer.solana.com/tx/${trade.signature}?cluster=devnet`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-purple)', fontSize: '0.85rem', textDecoration: 'none' }}>View Tx ↗</a>
                     </div>
                   </div>
                 ))}
