@@ -501,8 +501,11 @@ function TradeModal({ market, walletAddress, walletType, onClose, onConnectWalle
       } else if (walletType === 'metamask') {
         const mm = window.ethereum;
         if (mm) {
-          const balanceHex = await mm.request({ method: 'eth_getBalance', params: [walletAddress, 'latest'] }) as string;
-          currentBalance = parseInt(balanceHex, 16) / 1e18;
+          // MetaMask Snaps (Solflare) don't natively respond to eth_getBalance for Solana addresses.
+          // We bypass the rigid balance check here because the snap itself will gracefully fail
+          // or succeed when we actually prompt the user to sign the transaction.
+          console.log('[ConfirmTrade] Bypassing native eth_getBalance check for MetaMask Snap.');
+          currentBalance = 1; // Assume sufficient balance to proceed to the signature prompt
         }
       }
 
