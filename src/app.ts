@@ -5,6 +5,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { logger } from './core/logger/logger';
+// Existing routes
 import { marketsRouter } from './modules/markets/markets.controller';
 import { portfolioRouter } from './modules/portfolio/portfolio.controller';
 import { tradesRouter } from './modules/trades/trades.controller';
@@ -13,6 +14,14 @@ import { pointsRouter } from './modules/points/points.controller';
 import { shareRouter } from './modules/share/share.controller';
 import { onboardingRouter } from './modules/onboarding/onboarding.controller';
 import { metricsRouter, apiResponseTime } from './modules/metrics/metrics.controller';
+// New routes
+import { authRouter } from './modules/auth/auth.controller';
+import { predictionsRouter } from './modules/predictions/predictions.controller';
+import { adminRouter } from './modules/admin/admin.controller';
+import { socialRouter } from './modules/social/social.controller';
+import { creatorsRouter } from './modules/creators/creators.controller';
+import { cardsRouter } from './modules/cards/cards.controller';
+import { dailyRouter } from './modules/daily/daily.controller';
 import { errorHandler } from './core/config/error.handler';
 
 export function buildApp() {
@@ -38,16 +47,6 @@ export function buildApp() {
         next();
     });
 
-    // API Response Time middleware
-    app.use((req, res, next) => {
-        const start = Date.now();
-        res.on('finish', () => {
-            const duration = Date.now() - start;
-            apiResponseTime.labels(req.method, req.route ? req.route.path : req.path, res.statusCode.toString()).observe(duration);
-        });
-        next();
-    });
-
     const limiter = rateLimit({
         windowMs: 60 * 1000,
         max: 100,
@@ -61,6 +60,7 @@ export function buildApp() {
         res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'simpredict-backend' });
     });
 
+    // Existing routes
     app.use('/markets', marketsRouter);
     app.use('/portfolio', portfolioRouter);
     app.use('/trade', tradesRouter);
@@ -69,6 +69,17 @@ export function buildApp() {
     app.use('/share', shareRouter);
     app.use('/onboarding', onboardingRouter);
     app.use('/metrics', metricsRouter);
+
+    // New V1 routes
+    app.use('/api/auth', authRouter);
+    app.use('/api/predictions', predictionsRouter);
+    app.use('/api/admin', adminRouter);
+    app.use('/api/comments', socialRouter);
+    app.use('/api/follow', socialRouter);
+    app.use('/api/feed', socialRouter);
+    app.use('/api/creators', creatorsRouter);
+    app.use('/api/cards', cardsRouter);
+    app.use('/api/daily', dailyRouter);
 
     app.use(errorHandler);
 

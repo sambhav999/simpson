@@ -12,6 +12,19 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.string().default('info'),
   TREASURY_WALLET: z.string().optional(),
+
+  // Auth
+  JWT_SECRET: z.string().default('dev-secret-change-in-production'),
+  JWT_EXPIRY: z.string().default('24h'),
+
+  // Cloudflare R2
+  R2_ENDPOINT: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET_NAME: z.string().default('simpredicts-cards'),
+
+  // App
+  APP_URL: z.string().default('http://localhost:5173'),
 });
 
 const parsed = envSchema.safeParse(process.env);

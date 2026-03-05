@@ -8,57 +8,98 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── User ───────────────────────────────────────────────────────────
 model User {
-  walletAddress String         @id @map("wallet_address")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  currentStreak Int            @default(0) @map("current_streak")
-  highestStreak Int            @default(0) @map("highest_streak")
-  lastTradeDate DateTime?      @map("last_trade_date")
-  avatarUrl     String?        @map("avatar_url")
-  username      String?        @unique
-  leaderboards  Leaderboard[]
-  points        Points?
-  pointsLedger  PointsLedger[]
-  positions     Position[]
-  trades        Trade[]
+  walletAddress String   @id @map("wallet_address")
+  username      String?  @unique
+  bio           String?
+  avatarUrl     String?  @map("avatar_url")
+  xpTotal       Int      @default(0) @map("xp_total")
+  currentStreak Int      @default(0) @map("current_streak")
+  highestStreak Int      @default(0) @map("highest_streak")
+  lastTradeDate DateTime? @map("last_trade_date")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  leaderboards        Leaderboard[]
+  points              Points?
+  pointsLedger        PointsLedger[]
+  positions           Position[]
+  trades              Trade[]
+  xpTransactions      XPTransaction[]
+  aiPredictions       AIPrediction[]
+  comments            Comment[]
+  memeCards            MemeCard[]
+  creatorMarkets      CreatorMarket[]
+  attributionsAsCreator Attribution[] @relation("CreatorAttributions")
+  attributionsAsUser    Attribution[] @relation("UserAttributions")
+  followers           Follow[] @relation("Following")
+  following           Follow[] @relation("Followers")
+  userDailyPredictions UserDailyPrediction[]
 
   @@map("users")
 }
 
+// ─── Market ─────────────────────────────────────────────────────────
 model Market {
-  id               String            @id @default(cuid())
-  title            String
-  description      String            @default("")
-  yesTokenMint     String            @map("yes_token_mint")
-  noTokenMint      String            @map("no_token_mint")
-  expiry           DateTime?
-  status           String            @default("active")
-  category         String            @default("general")
-  externalId       String?           @unique @map("external_id")
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
-  divergenceScore  Float             @default(0) @map("divergence_score")
-  oraclePrice      Float?            @map("oracle_price")
-  image            String?           @map("image_url")
+  id              String   @id @default(cuid())
+  externalId      String?  @unique @map("external_id")
+  source          String   @default("polymarket") // polymarket, limitless, myriad
+  title           String
+  description     String   @default("")
+  category        String   @default("general")
+  yesPrice        Float?   @map("yes_price") // 0.0000 - 1.0000
+  noPrice         Float?   @map("no_price")
+  volume          Float?   @default(0) // Total volume USD
+  liquidity       Float?   @default(0)
+  yesTokenMint    String   @map("yes_token_mint")
+  noTokenMint     String   @map("no_token_mint")
+  expiry          DateTime?
+  closesAt        DateTime? @map("closes_at")
+  status          String   @default("active")
+  resolved        Boolean  @default(false)
+  resolution      String?  // YES, NO, INVALID
+  image           String?  @map("image_url")
+  sourceUrl       String?  @map("source_url")
+  divergenceScore Float    @default(0) @map("divergence_score")
+  oraclePrice     Float?   @map("oracle_price")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
   positions        Position[]
   protocolRevenues ProtocolRevenue[]
   trades           Trade[]
+  aiPredictions    AIPrediction[]
+  comments         Comment[]
+  memeCards        MemeCard[]
+  creatorMarkets   CreatorMarket[]
+  attributions     Attribution[]
+  dailyBattleMarkets DailyBattleMarket[]
 
   @@index([status])
   @@index([category])
+  @@index([source])
   @@index([yesTokenMint])
   @@index([noTokenMint])
+  @@index([closesAt])
   @@map("markets")
 }
 
+// ─── Position ───────────────────────────────────────────────────────
 model Position {
   id                String   @id @default(cuid())
   walletAddress     String   @map("wallet_address")
   marketId          String   @map("market_id")
   tokenMint         String   @map("token_mint")
+  side              String?  // YES or NO
+  entryOdds         Float?   @map("entry_odds")
   amount            Float    @default(0)
   averageEntryPrice Float    @default(0) @map("average_entry_price")
   realizedPnl       Float    @default(0) @map("realized_pnl")
+  status            String   @default("ACTIVE") // ACTIVE, WON, LOST
+  predictedAt       DateTime @default(now()) @map("predicted_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
   market            Market   @relation(fields: [marketId], references: [id])
   user              User     @relation(fields: [walletAddress], references: [walletAddress])
@@ -66,9 +107,11 @@ model Position {
   @@unique([walletAddress, marketId, tokenMint])
   @@index([walletAddress])
   @@index([marketId])
+  @@index([status])
   @@map("positions")
 }
 
+// ─── Trade ──────────────────────────────────────────────────────────
 model Trade {
   id            String   @id @default(cuid())
   walletAddress String   @map("wallet_address")
@@ -91,15 +134,205 @@ model Trade {
   @@map("trades")
 }
 
+// ─── AI Prediction (Homer Baba) ─────────────────────────────────────
+model AIPrediction {
+  id            String   @id @default(cuid())
+  marketId      String   @map("market_id")
+  prediction    String   // YES or NO
+  confidence    Int      // 1-100
+  commentary    String   @db.VarChar(280)
+  featured      Boolean  @default(false)
+  featuredRank  Int?     @map("featured_rank")
+  resolved      Boolean  @default(false)
+  result        String   @default("PENDING") // WIN, LOSS, PENDING
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Optional: track which admin created it
+  createdBy     String?  @map("created_by")
+  creator       User?    @relation(fields: [createdBy], references: [walletAddress])
+  market        Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@index([marketId])
+  @@index([resolved])
+  @@index([featured])
+  @@map("ai_predictions")
+}
+
+// ─── Creator Market (Hosted Markets) ────────────────────────────────
+model CreatorMarket {
+  id           String   @id @default(cuid())
+  creatorId    String   @map("creator_id")
+  marketId     String   @map("market_id")
+  caption      String   @db.VarChar(280)
+  referralCode String   @unique @map("referral_code") @db.VarChar(8)
+  hostedAt     DateTime @default(now()) @map("hosted_at")
+
+  creator      User     @relation(fields: [creatorId], references: [walletAddress], onDelete: Cascade)
+  market       Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@index([marketId])
+  @@index([referralCode])
+  @@map("creator_markets")
+}
+
+// ─── Attribution (Referral Tracking) ────────────────────────────────
+model Attribution {
+  id            String   @id @default(cuid())
+  creatorId     String?  @map("creator_id")
+  userId        String?  @map("user_id")
+  marketId      String   @map("market_id")
+  referralCode  String?  @map("referral_code") @db.VarChar(8)
+  clickedAt     DateTime @default(now()) @map("clicked_at")
+  converted     Boolean  @default(false)
+  tradePlatform String?  @map("trade_platform") // polymarket, limitless, myriad
+
+  creator       User?    @relation("CreatorAttributions", fields: [creatorId], references: [walletAddress])
+  user          User?    @relation("UserAttributions", fields: [userId], references: [walletAddress])
+  market        Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@index([referralCode])
+  @@index([clickedAt])
+  @@map("attributions")
+}
+
+// ─── Comment ────────────────────────────────────────────────────────
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  marketId  String   @map("market_id")
+  parentId  String?  @map("parent_id")
+  text      String   @db.VarChar(500)
+  upvotes   Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [walletAddress], onDelete: Cascade)
+  market    Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+
+  @@index([marketId])
+  @@index([parentId])
+  @@index([createdAt])
+  @@map("comments")
+}
+
+// ─── Follow ─────────────────────────────────────────────────────────
+model Follow {
+  followerId  String   @map("follower_id")
+  followingId String   @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower    User     @relation("Followers", fields: [followerId], references: [walletAddress], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [walletAddress], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+// ─── Meme Card ──────────────────────────────────────────────────────
+model MemeCard {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  marketId   String   @map("market_id")
+  template   String   // prediction, win, loss, streak
+  imageUrl   String   @map("image_url")
+  trackingId String   @unique @map("tracking_id") @db.VarChar(16)
+  shares     Int      @default(0)
+  clicks     Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+  expiresAt  DateTime? @map("expires_at")
+
+  user       User     @relation(fields: [userId], references: [walletAddress], onDelete: Cascade)
+  market     Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@index([trackingId])
+  @@index([userId])
+  @@map("meme_cards")
+}
+
+// ─── XP Transaction (Audit Trail) ───────────────────────────────────
+model XPTransaction {
+  id            String   @id @default(cuid())
+  walletAddress String   @map("wallet_address")
+  amount        Int
+  reason        String   @db.VarChar(100)
+  metadata      Json?    @db.JsonB
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user          User     @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+
+  @@index([walletAddress])
+  @@index([createdAt])
+  @@map("xp_transactions")
+}
+
+// ─── Daily Battle ───────────────────────────────────────────────────
+model DailyBattle {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date
+  status    String   @default("active") // active, resolved
+  createdAt DateTime @default(now()) @map("created_at")
+
+  markets   DailyBattleMarket[]
+
+  @@index([date])
+  @@index([status])
+  @@map("daily_battles")
+}
+
+// ─── Daily Battle Market ────────────────────────────────────────────
+model DailyBattleMarket {
+  id               String   @id @default(cuid())
+  dailyBattleId    String   @map("daily_battle_id")
+  marketId         String   @map("market_id")
+  position         Int      // 1-5
+  homerPrediction  String   @map("homer_prediction") // YES or NO
+  homerConfidence  Int      @map("homer_confidence") // 1-100
+  homerCommentary  String?  @map("homer_commentary") @db.VarChar(280)
+  result           String   @default("PENDING") // WIN, LOSS, PENDING
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  dailyBattle      DailyBattle @relation(fields: [dailyBattleId], references: [id], onDelete: Cascade)
+  market           Market      @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  userPredictions  UserDailyPrediction[]
+
+  @@unique([dailyBattleId, position])
+  @@index([dailyBattleId])
+  @@index([result])
+  @@map("daily_battle_markets")
+}
+
+// ─── User Daily Prediction ──────────────────────────────────────────
+model UserDailyPrediction {
+  id                   String   @id @default(cuid())
+  userId               String   @map("user_id")
+  dailyBattleMarketId  String   @map("daily_battle_market_id")
+  prediction           String   // YES or NO
+  result               String   @default("PENDING") // WIN, LOSS, PENDING
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  user                 User              @relation(fields: [userId], references: [walletAddress], onDelete: Cascade)
+  dailyBattleMarket    DailyBattleMarket @relation(fields: [dailyBattleMarketId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dailyBattleMarketId])
+  @@index([userId])
+  @@index([result])
+  @@map("user_daily_predictions")
+}
+
+// ─── Leaderboard ────────────────────────────────────────────────────
 model Leaderboard {
+  id            String   @id @default(cuid())
   walletAddress String   @map("wallet_address")
   totalVolume   Float    @default(0) @map("total_volume")
   totalPnl      Float    @default(0) @map("total_pnl")
   winRate       Float    @default(0) @map("win_rate")
   tradeCount    Int      @default(0) @map("trade_count")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  id            String   @id @default(cuid())
   period        String   @default("ALL_TIME")
+  updatedAt     DateTime @updatedAt @map("updated_at")
   user          User     @relation(fields: [walletAddress], references: [walletAddress])
 
   @@unique([walletAddress, period])
@@ -108,6 +341,7 @@ model Leaderboard {
   @@map("leaderboard")
 }
 
+// ─── Protocol Revenue ───────────────────────────────────────────────
 model ProtocolRevenue {
   id          String   @id @default(cuid())
   marketId    String   @map("market_id")
@@ -121,6 +355,7 @@ model ProtocolRevenue {
   @@map("protocol_revenue")
 }
 
+// ─── Points (Legacy - kept for backward compat) ─────────────────────
 model Points {
   walletAddress String   @id @map("wallet_address")
   balance       Int      @default(0)
@@ -131,6 +366,7 @@ model Points {
   @@map("points")
 }
 
+// ─── Points Ledger (Legacy - kept for backward compat) ──────────────
 model PointsLedger {
   id            String   @id @default(cuid())
   walletAddress String   @map("wallet_address")
@@ -143,6 +379,7 @@ model PointsLedger {
   @@map("points_ledger")
 }
 
+// ─── Indexer State ──────────────────────────────────────────────────
 model IndexerState {
   id            String   @id @default("singleton")
   lastSignature String?  @map("last_signature")
