@@ -508,14 +508,13 @@ function TradeModal({ market, walletAddress, walletType, onClose, onConnectWalle
 
       console.log(`[ConfirmTrade] Current balance: ${currentBalance}`);
 
-      // 2. Check if sufficient
+      // 2. Check if sufficient (MOCK Check - just ensure they have *some* gas for Devnet)
       const requiredAmount = quote.total;
-      const roughUsdBalance = walletType === 'phantom' ? currentBalance * 150 : currentBalance * 3000;
 
-      console.log(`[ConfirmTrade] Checking funds: Need $${requiredAmount}, Have ~$${roughUsdBalance} (${walletType})`);
+      console.log(`[ConfirmTrade] Checking funds for trade of ${requiredAmount} shares. User has ${currentBalance} native token (${walletType})`);
 
-      if (roughUsdBalance < requiredAmount) {
-        throw new Error(`Insufficient funds. Need $${requiredAmount.toFixed(2)} USD equivalent.`);
+      if (currentBalance < 0.01) {
+        throw new Error(`Insufficient funds. You need at least 0.01 native token for gas to place this trade.`);
       }
 
       console.log('[ConfirmTrade] Balance sufficient. Simulating wallet signing...');
