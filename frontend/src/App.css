@@ -481,6 +481,13 @@
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
+.source-badge.manifold {
+  background: rgba(45, 212, 191, 0.12);
+  color: #2dd4bf;
+  /* Teal/Cyan */
+  border: 1px solid rgba(45, 212, 191, 0.25);
+}
+
 .card-footer-right {
   display: flex;
   align-items: center;

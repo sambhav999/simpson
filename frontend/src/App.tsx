@@ -112,6 +112,7 @@ const SOURCES = [
   { key: 'limitless', label: 'Limitless', icon: '♾️' },
   { key: 'polymarket', label: 'Polymarket', icon: '📈' },
   { key: 'myriad', label: 'Myriad', icon: '🔮' },
+  { key: 'manifold', label: 'Manifold', icon: '🎯' },
 ];
 
 function App() {
@@ -308,6 +309,7 @@ function App() {
       case 'limitless': return '♾️';
       case 'polymarket': return '📈';
       case 'myriad': return '🔮';
+      case 'manifold': return '🎯';
       default: return '🌐';
     }
   };
@@ -405,7 +407,7 @@ function App() {
       {currentView === 'markets' && (
         <section className="hero">
           <h1>Prediction Markets</h1>
-          <p>Browse and trade on real-world event outcomes from Limitless, Polymarket & more</p>
+          <p>Browse and trade on real-world event outcomes from Limitless, Polymarket, Manifold & more</p>
         </section>
       )}
 

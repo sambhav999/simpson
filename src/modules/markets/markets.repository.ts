@@ -30,8 +30,8 @@ export class MarketsRepository {
         category: market.category,
         image: market.image,
         source: market.source || 'polymarket',
-        volume: market.volume ? parseFloat(market.volume) : undefined,
-        liquidity: market.liquidity ? parseFloat(market.liquidity) : undefined,
+        volume: this.parseNumericString(market.volume),
+        liquidity: this.parseNumericString(market.liquidity),
       },
       update: {
         title: market.title,
@@ -41,8 +41,8 @@ export class MarketsRepository {
         category: market.category,
         image: market.image,
         source: market.source || undefined,
-        volume: market.volume ? parseFloat(market.volume) : undefined,
-        liquidity: market.liquidity ? parseFloat(market.liquidity) : undefined,
+        volume: this.parseNumericString(market.volume),
+        liquidity: this.parseNumericString(market.liquidity),
       },
     });
   }
@@ -107,5 +107,13 @@ export class MarketsRepository {
         OR: [{ yesTokenMint: tokenMint }, { noTokenMint: tokenMint }],
       },
     });
+  }
+
+  private parseNumericString(val?: string): number | undefined {
+    if (!val) return undefined;
+    // Remove currency symbols, commas, and other non-numeric chars except .
+    const clean = val.replace(/[^\d.-]/g, '');
+    const num = parseFloat(clean);
+    return isNaN(num) ? undefined : num;
   }
 }

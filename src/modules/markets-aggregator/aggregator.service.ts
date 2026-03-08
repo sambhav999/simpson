@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import axiosRetry from 'axios-retry';
 // @ts-ignore
-import MyriadClient from 'myriad-sdk';
+// import MyriadClient from 'myriad-sdk'; // Bypassing SDK due to issues
 import { config } from '../../core/config/config';
 import { logger } from '../../core/logger/logger';
 import { AppError } from '../../core/config/error.handler';
@@ -50,7 +50,7 @@ export interface AggregatedMarket {
     expiry: string | null;
     status: string;
     category: string;
-    source?: 'limitless' | 'myriad' | 'polymarket';
+    source?: 'limitless' | 'myriad' | 'polymarket' | 'manifold';
     image?: string;
     volume?: string;
     liquidity?: string;
@@ -78,6 +78,7 @@ export class AggregatorService {
     private readonly limitlessClient: AxiosInstance;
     private readonly myriadClient: AxiosInstance;
     private readonly polymarketClient: AxiosInstance;
+    private readonly manifoldClient: AxiosInstance;
 
     constructor() {
         const limitlessHeaders: Record<string, string> = {};
@@ -87,6 +88,7 @@ export class AggregatorService {
         this.limitlessClient = this.createClient(config.LIMITLESS_API_URL, limitlessHeaders);
         this.myriadClient = this.createClient(config.MYRIAD_API_URL);
         this.polymarketClient = this.createClient(config.POLYMARKET_API_URL);
+        this.manifoldClient = this.createClient('https://api.manifold.markets/v0');
     }
 
     private createClient(baseURL: string, extraHeaders: Record<string, string> = {}): AxiosInstance {
@@ -116,10 +118,11 @@ export class AggregatorService {
 
             // In a real implementation, you would hit the actual endpoints for each service
             // Example of parallel fetching:
-            const [limitlessRes, myriadRes, polymarketRes] = await Promise.allSettled([
+            const [limitlessRes, myriadRes, polymarketRes, manifoldRes] = await Promise.allSettled([
                 this.fetchLimitlessMarkets(),
                 this.fetchMyriadMarkets(),
-                this.fetchPolymarketMarkets()
+                this.fetchPolymarketMarkets(),
+                this.fetchManifoldMarkets()
             ]);
 
             const allMarkets: AggregatedMarket[] = [];
@@ -140,6 +143,12 @@ export class AggregatorService {
                 allMarkets.push(...polymarketRes.value.map(m => ({ ...m, source: 'polymarket' as const })));
             } else {
                 logger.error(`Failed to fetch from Polymarket: ${polymarketRes.reason}`);
+            }
+
+            if (manifoldRes.status === 'fulfilled') {
+                allMarkets.push(...manifoldRes.value.map(m => ({ ...m, source: 'manifold' as const })));
+            } else {
+                logger.error(`Failed to fetch from Manifold: ${manifoldRes.reason}`);
             }
 
             logger.info(`Fetched ${allMarkets.length} consolidated markets from aggregator sources`);
@@ -224,25 +233,16 @@ export class AggregatorService {
 
     private async fetchMyriadMarkets(): Promise<AggregatedMarket[]> {
         try {
-            // Myriad SDK requires WEB3_PROVIDER to be set in env.
-            // If missing, we provide a default devnet fallback to prevent constructor crash.
-            if (!process.env.WEB3_PROVIDER) {
-                process.env.WEB3_PROVIDER = 'https://api.devnet.solana.com';
-            }
-
-            const myriadClient = new MyriadClient();
-
-            // The Myriad API may require a token or return empty if not authenticated.
-            // We wrap this in a try-catch to ensure one failed source doesn't block the aggregator.
-            const response = await myriadClient.myriad.fetchMarkets({ status: 'open' as any }).catch((e: any) => {
-                logger.warn(`Myriad SDK fetchMarkets failed: ${e.message}`);
-                return { data: [] };
+            // Using direct Axios client instead of SDK to bypass authentication issues
+            // and target the configured MYRIAD_API_URL.
+            const response = await this.myriadClient.get('/markets', {
+                params: { status: 'open' }
             });
 
-            const markets = response?.data || [];
+            const markets = response.data?.data || response.data || [];
 
-            if (markets.length === 0) {
-                logger.info('Myriad: SDK returned 0 markets');
+            if (!Array.isArray(markets) || markets.length === 0) {
+                logger.info('Myriad: API returned 0 markets');
                 return [];
             }
 
@@ -251,25 +251,59 @@ export class AggregatorService {
                     id: `MYR-${m.id}`,
                     title: m.title || 'Unknown Market',
                     description: m.description || '',
-                    yesTokenMint: `MYR_YES_${m.id}`,
-                    noTokenMint: `MYR_NO_${m.id}`,
-                    expiry: m.expiresAt || null,
+                    yesTokenMint: m.yesTokenMint || `MYR_YES_${m.id}`,
+                    noTokenMint: m.noTokenMint || `MYR_NO_${m.id}`,
+                    expiry: m.expiresAt || m.expirationDate || null,
                     status: m.status === 'open' ? 'active' : m.status,
-                    category: m.category?.name || m.category?.id || 'Myriad',
-                    image: m.imageUrl || undefined,
-                    volume: m.volume?.total ? `$${m.volume.total.toLocaleString()}` : undefined,
-                    liquidity: m.liquidity?.total ? `$${m.liquidity.total.toLocaleString()}` : undefined,
-                    prices: (m.outcomes && m.outcomes.length >= 2) ? [m.outcomes[0].price, m.outcomes[1].price] : undefined,
+                    category: m.category?.name || m.category || 'Myriad',
+                    image: m.imageUrl || m.image || undefined,
+                    volume: m.volume?.total || m.volumeFormatted || undefined,
+                    liquidity: m.liquidity?.total || m.liquidityFormatted || undefined,
+                    prices: m.prices || undefined,
                     source: 'myriad' as const,
                     slug: m.slug || undefined
                 };
             });
 
-            logger.info(`Myriad: fetched ${parsedMarkets.length} active markets from SDK`);
+            logger.info(`Myriad: fetched ${parsedMarkets.length} active markets from API`);
             return parsedMarkets;
         } catch (err) {
-            logger.error(`Failed to fetch from Myriad: ${err}`);
-            throw err;
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            logger.warn(`Failed to fetch from Myriad: ${message}`);
+            return []; // Fail gracefully for aggregator
+        }
+    }
+
+    private async fetchManifoldMarkets(): Promise<AggregatedMarket[]> {
+        try {
+            const response = await this.manifoldClient.get('/markets', {
+                params: { limit: 50, sort: 'created-time', order: 'desc' }
+            });
+
+            const markets = response.data;
+
+            if (!Array.isArray(markets)) return [];
+
+            return markets.map((m: any): AggregatedMarket => ({
+                id: `MNF-${m.id}`,
+                title: m.question || 'Unknown Manifold Market',
+                description: m.description || '',
+                yesTokenMint: `MNF_YES_${m.id}`,
+                noTokenMint: `MNF_NO_${m.id}`,
+                expiry: m.closeTime ? new Date(m.closeTime).toISOString() : null,
+                status: m.isResolved ? 'resolved' : 'active',
+                category: (m.groupSlugs && m.groupSlugs.length > 0) ? m.groupSlugs[0] : 'Manifold',
+                image: m.coverImageUrl || undefined,
+                volume: m.volume ? String(Math.round(m.volume)) : undefined,
+                liquidity: m.totalLiquidity ? String(Math.round(m.totalLiquidity)) : undefined,
+                prices: (typeof m.probability === 'number') ? [m.probability, 1 - m.probability] : undefined,
+                source: 'manifold',
+                slug: m.slug || undefined
+            }));
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            logger.warn(`Failed to fetch from Manifold: ${message}`);
+            return [];
         }
     }
 
