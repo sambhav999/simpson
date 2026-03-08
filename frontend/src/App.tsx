@@ -11,7 +11,6 @@ const OracleView = lazy(() => import('./components/OracleView'));
 const DailyChallengesView = lazy(() => import('./components/DailyChallengesView'));
 const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
 const TradeModal = lazy(() => import('./components/TradeModal'));
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 const API = import.meta.env.VITE_BACKEND_URL;
 
@@ -73,7 +72,7 @@ function App() {
   const [category, setCategory] = useState('All');
   const [source, setSource] = useState('all');
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
-  const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle' | 'admin'>('markets');
+  const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle'>('markets');
 
   // Daily 5 State
   const [dailyBattle, setDailyBattle] = useState<any>(null);
@@ -469,7 +468,6 @@ function App() {
               fetchDailyData={fetchDailyData}
               walletAddress={walletAddress}
               setShowWalletSelector={setShowWalletSelector}
-              setCurrentView={setCurrentView}
             />
           )}
 
@@ -480,10 +478,6 @@ function App() {
               loading={aiLoading}
               onMarketClick={handleMarketClick}
             />
-          )}
-
-          {currentView === 'admin' && (
-            <AdminDashboard />
           )}
         </ErrorBoundary>
       </Suspense>

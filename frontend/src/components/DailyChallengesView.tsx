@@ -13,8 +13,7 @@ export default function DailyChallengesView({
     setSubmittingDaily,
     fetchDailyData,
     walletAddress,
-    setShowWalletSelector,
-    setCurrentView
+    setShowWalletSelector
 }: any) {
 
     const handlePrediction = (marketId: string, prediction: 'YES' | 'NO') => {
@@ -64,15 +63,9 @@ export default function DailyChallengesView({
     return (
         <main className="main-content">
             <div className="battle-arena">
-                <div style={{ textAlign: 'center', marginBottom: '3rem', position: 'relative' }}>
+                <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
                     <h1 style={{ fontSize: '3rem', fontWeight: '900' }}>THE DAILY 5</h1>
                     <p>Man vs Machine. Beat Homer Baba to climb the ranks.</p>
-                    <button
-                        onClick={() => setCurrentView('admin')}
-                        style={{ position: 'absolute', top: 0, right: 0, background: 'var(--accent-purple)', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-                    >
-                        Admin Dashboard
-                    </button>
                 </div>
 
                 {dailyScoreboard && (
