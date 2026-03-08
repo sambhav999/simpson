@@ -238,7 +238,7 @@ function App() {
 
       if (walletAddress) {
         headers['Authorization'] = `Bearer ${walletAddress}`;
-        fetches.push(fetch(`${API}/daily/user/stats`, { headers }));
+        fetches.push(fetch(`${API}/api/daily/user/stats`, { headers }));
       }
 
       const results = await Promise.all(fetches);
