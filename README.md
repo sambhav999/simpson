@@ -6,6 +6,16 @@ This application acts as a real-time aggregator for top prediction markets (such
 
 ---
 
+## 🆕 Recent Updates & Scale Optimization
+
+- **Limitless Market Aggregation**: Successfully integrated the live Limitless API into the backend aggregator service (`AggregatorService`). Adapted the pagination and polling parameters (enforcing strict limits and dropping unsupported sorting flags) to align with endpoint constraints, mitigating generic `400 Bad Request` drop-offs.
+- **Dynamic Frontend Source Routing**: Overhauled the React frontend to feature a source-aware UI. Integrated a new interactive pill-based source switcher allowing users to filter prediction markets natively (`All`, `Limitless`, `Polymarket`, `Myriad`), along with dynamic CSS-styled source badges directly rendered on market cards.
+- **Resilient BullMQ & Redis Connection Pooling**: Refactored the Node.js background processors (`market-sync`, `portfolio-sync`, `fee-reconciliation`, `oracle-sync`) to utilize a unified singleton `IORedis` connection factory. Configured `lazyConnect: true` and `maxRetriesPerRequest: null`, successfully eliminating recursive `ERR max number of clients reached` exhaustion bottlenecks on managed DigitalOcean Redis instances.
+- **Prisma Schema Fallbacks**: Resolved rigid PostgreSQL schema validation errors that caused silent drops during background job loops. Implemented robust data normalization with graceful string fallbacks ('N/A') for missing polymorphic aggregator properties (like `yesTokenMint`), successfully pushing 400+ Limitless markets through the `upsertMany` pipeline transaction.
+- **Manual Sync Webhook**: Appended a new RESTful `POST /markets/sync` controller endpoint enabling on-demand, manual force-triggers bridging the frontend and the multi-source aggregator jobs.
+
+---
+
 ## Architecture Overview
 
 This project is a monorepo consisting of:
