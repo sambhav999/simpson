@@ -7,7 +7,7 @@ import { useUserStore } from '../stores/userStore';
 
 export default function FeedPage() {
     const navigate = useNavigate();
-    const { currentIndex, setCurrentIndex, markets, setMarkets, nextMarket, prevMarket } = useFeedStore();
+    const { currentIndex, markets, setMarkets, nextMarket, prevMarket } = useFeedStore();
     const { isAuthenticated } = useUserStore();
     const containerRef = useRef<HTMLDivElement>(null);
     const [touchStart, setTouchStart] = useState(0);

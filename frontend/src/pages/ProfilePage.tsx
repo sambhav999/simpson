@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { fetchCreatorProfile, fetchCreatorMarkets, fetchUserPredictions, followUser, unfollowUser } from '../lib/api';
+import { fetchCreatorProfile, fetchCreatorMarkets, fetchUserPredictions, followUser } from '../lib/api';
 import { useUserStore, getRankBadge } from '../stores/userStore';
 
 export default function ProfilePage() {
@@ -146,8 +146,8 @@ export default function ProfilePage() {
                             <div key={p.id} onClick={() => navigate(`/market/${p.market.id}`)}
                                 className="p-3 rounded-xl bg-white/5 flex items-center gap-3 cursor-pointer hover:bg-white/10 transition-colors">
                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${p.status === 'WON' ? 'bg-emerald-500/20 text-emerald-400' :
-                                        p.status === 'LOST' ? 'bg-red-500/20 text-red-400' :
-                                            'bg-gray-500/20 text-gray-400'
+                                    p.status === 'LOST' ? 'bg-red-500/20 text-red-400' :
+                                        'bg-gray-500/20 text-gray-400'
                                     }`}>{p.side}</span>
                                 <p className="text-sm flex-1 truncate">{p.market.question}</p>
                                 <span className="text-xs text-gray-500">{new Date(p.predicted_at).toLocaleDateString()}</span>

@@ -8,7 +8,7 @@ import { useState } from 'react';
 export default function MarketDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { isAuthenticated, wallet } = useUserStore();
+    const { isAuthenticated } = useUserStore();
     const [commentText, setCommentText] = useState('');
 
     const { data: market, isLoading } = useQuery({

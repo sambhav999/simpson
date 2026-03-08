@@ -21,7 +21,7 @@ export default function LandingPage() {
         const wallet = publicKey.toBase58();
         try {
             // Get nonce
-            const { nonce, message } = await requestNonce(wallet);
+            const { message } = await requestNonce(wallet);
 
             // Sign message
             let signature = 'dev-signature';

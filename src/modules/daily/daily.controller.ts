@@ -14,12 +14,12 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
         today.setHours(0, 0, 0, 0);
 
         const battle = await prisma.dailyBattle.findFirst({
-            where: { date: { gte: today } },
+            orderBy: { date: 'desc' },
             include: {
                 markets: {
                     include: {
                         market: {
-                            select: { id: true, title: true, yesPrice: true, noPrice: true, source: true, image: true, closesAt: true, expiry: true },
+                            select: { id: true, title: true, yesPrice: true, noPrice: true, source: true, image: true, closesAt: true, expiry: true, status: true, category: true },
                         },
                     },
                     orderBy: { position: 'asc' },
@@ -60,6 +60,8 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
                     source: m.market.source,
                     image_url: m.market.image,
                     closes_at: m.market.closesAt || m.market.expiry,
+                    status: m.market.status,
+                    category: m.market.category,
                 },
                 homer_prediction: m.homerPrediction,
                 homer_confidence: m.homerConfidence,

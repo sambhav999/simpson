@@ -9,7 +9,7 @@ import './index.css'
 import '@solana/wallet-adapter-react-ui/styles.css'
 
 function Root() {
-  const endpoint = useMemo(() => clusterApiUrl('mainnet-beta'), [])
+  const endpoint = useMemo(() => import.meta.env.VITE_SOLANA_RPC_URL || clusterApiUrl('devnet'), [])
   const wallets = useMemo(() => [new SolflareWalletAdapter()], [])
 
   return (
