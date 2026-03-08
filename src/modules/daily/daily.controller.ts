@@ -7,13 +7,13 @@ import { AppError } from '../../core/config/error.handler';
 const router = Router();
 const prisma = PrismaService.getInstance();
 
-// GET /api/daily — Today's Daily 5 battle
+// GET /api/daily — Today's Daily battle
 router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const battle = await prisma.dailyBattle.findFirst({
+        let battle = await prisma.dailyBattle.findFirst({
             orderBy: { date: 'desc' },
             include: {
                 markets: {
@@ -28,7 +28,49 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
         });
 
         if (!battle) {
-            return res.json({ message: 'No daily battle available today', markets: [] });
+            // Auto-generate today's battle if it doesn't exist
+            const unfeaturedMarkets = await prisma.market.findMany({
+                where: {
+                    status: 'active',
+                    resolved: false,
+                    aiPredictions: { none: {} },
+                },
+            });
+
+            if (unfeaturedMarkets.length < 10) {
+                return res.json({ message: 'Not enough active markets to generate a daily battle today', markets: [] });
+            }
+
+            // Shuffle and pick 10-20
+            const shuffled = unfeaturedMarkets.sort(() => 0.5 - Math.random());
+            const numMarkets = Math.floor(Math.random() * 11) + 10; // 10 to 20
+            const selectedMarkets = shuffled.slice(0, numMarkets);
+
+            battle = await prisma.dailyBattle.create({
+                data: {
+                    date: today,
+                    status: 'active',
+                    markets: {
+                        create: selectedMarkets.map((m, idx) => ({
+                            marketId: m.id,
+                            position: idx + 1,
+                            homerPrediction: Math.random() > 0.5 ? 'YES' : 'NO',
+                            homerConfidence: Math.floor(Math.random() * 41) + 50, // 50 to 90
+                            homerCommentary: 'Homer Baba sees this outcome clearly in the decentralized stars.',
+                        })),
+                    },
+                },
+                include: {
+                    markets: {
+                        include: {
+                            market: {
+                                select: { id: true, title: true, yesPrice: true, noPrice: true, source: true, image: true, closesAt: true, expiry: true, status: true, category: true },
+                            },
+                        },
+                        orderBy: { position: 'asc' },
+                    },
+                },
+            });
         }
 
         // Get user predictions if logged in
@@ -78,14 +120,14 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
     }
 });
 
-// POST /api/daily/predict — Submit predictions for today's Daily 5
+// POST /api/daily/predict — Submit predictions for today's Daily
 router.post('/predict', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const schema = z.object({
             predictions: z.array(z.object({
                 daily_battle_market_id: z.string(),
                 prediction: z.enum(['YES', 'NO']),
-            })).length(5),
+            })).min(1),
         });
         const { predictions } = schema.parse(req.body);
         const wallet = req.user!.wallet;
@@ -111,7 +153,7 @@ router.post('/predict', requireAuth, async (req: Request, res: Response, next: N
         // Award +10 XP
         await prisma.$transaction([
             prisma.xPTransaction.create({
-                data: { walletAddress: wallet, amount: 10, reason: 'daily5_participation' },
+                data: { walletAddress: wallet, amount: 10, reason: 'daily_participation' },
             }),
             prisma.user.update({
                 where: { walletAddress: wallet },

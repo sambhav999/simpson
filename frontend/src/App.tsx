@@ -74,7 +74,7 @@ function App() {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle'>('markets');
 
-  // Daily 5 State
+  // Daily State
   const [dailyBattle, setDailyBattle] = useState<any>(null);
   const [dailyScoreboard, setDailyScoreboard] = useState<any>(null);
   const [dailyUserStats, setDailyUserStats] = useState<any>(null);
@@ -210,7 +210,7 @@ function App() {
         setDailyLeaderboard(leaderData.leaderboard || []);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch Daily 5 data');
+      setError(err instanceof Error ? err.message : 'Failed to fetch Daily data');
     } finally {
       setLoading(false);
     }
@@ -328,7 +328,7 @@ function App() {
           <button className={currentView === 'markets' ? 'active' : ''} onClick={() => setCurrentView('markets')}>Markets</button>
           <button className={currentView === 'portfolio' ? 'active' : ''} onClick={() => setCurrentView('portfolio')}>Portfolio</button>
           <button className={currentView === 'leaderboard' ? 'active' : ''} onClick={() => setCurrentView('leaderboard')}>Leaderboard</button>
-          <button className={currentView === 'daily' ? 'active' : ''} onClick={() => setCurrentView('daily')}>Daily 5</button>
+          <button className={currentView === 'daily' ? 'active' : ''} onClick={() => setCurrentView('daily')}>Daily</button>
           <button className={currentView === 'oracle' ? 'active' : ''} onClick={() => setCurrentView('oracle')}>AI Oracle 🔮</button>
         </nav>
 

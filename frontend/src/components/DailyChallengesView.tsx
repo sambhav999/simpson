@@ -34,7 +34,8 @@ export default function DailyChallengesView({
             daily_battle_market_id: marketId,
             prediction
         }));
-        if (predictionsArray.length < 5) return;
+        const totalMarkets = dailyBattle?.markets?.length || 0;
+        if (predictionsArray.length < totalMarkets) return;
         setSubmittingDaily(true);
         try {
             const res = await fetch(`${API}/api/daily/predict`, {
@@ -64,7 +65,7 @@ export default function DailyChallengesView({
         <main className="main-content">
             <div className="battle-arena">
                 <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-                    <h1 style={{ fontSize: '3rem', fontWeight: '900' }}>THE DAILY 5</h1>
+                    <h1 style={{ fontSize: '3rem', fontWeight: '900' }}>THE DAILY</h1>
                     <p>Man vs Machine. Beat Homer Baba to climb the ranks.</p>
                 </div>
 
@@ -110,8 +111,8 @@ export default function DailyChallengesView({
                 </div>
 
                 {dailyBattle && !hasParticipated && (
-                    <button className="trade-btn" disabled={numSelected < 5 || submittingDaily} onClick={submitDailyPredictions} style={{ width: '100%', padding: '1.5rem', marginTop: '2rem' }}>
-                        {submittingDaily ? 'Submitting...' : numSelected < 5 ? `Select ${5 - numSelected} more` : 'Lock In All Picks (+10 XP)'}
+                    <button className="trade-btn" disabled={numSelected < (dailyBattle.markets?.length || 0) || submittingDaily} onClick={submitDailyPredictions} style={{ width: '100%', padding: '1.5rem', marginTop: '2rem' }}>
+                        {submittingDaily ? 'Submitting...' : numSelected < (dailyBattle.markets?.length || 0) ? `Select ${(dailyBattle.markets?.length || 0) - numSelected} more` : 'Lock In All Picks (+10 XP)'}
                     </button>
                 )}
 

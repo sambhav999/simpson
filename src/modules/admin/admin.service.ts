@@ -68,7 +68,7 @@ export class AdminService {
     }
 
     /**
-     * Create a Daily 5 battle
+     * Create a Daily battle
      */
     async createDailyBattle(data: {
         date: string;
@@ -80,8 +80,8 @@ export class AdminService {
             homerCommentary?: string;
         }>;
     }) {
-        if (data.markets.length !== 5) {
-            throw new AppError('Must include exactly 5 markets', 400);
+        if (data.markets.length < 1) {
+            throw new AppError('Must include at least 1 market', 400);
         }
 
         // Check for existing battle on this date
@@ -113,12 +113,12 @@ export class AdminService {
             include: { markets: true },
         });
 
-        logger.info(`Daily 5 battle created for ${data.date}`);
-        return { id: battle.id, date: data.date, status: battle.status, markets_count: 5 };
+        logger.info(`Daily battle created for ${data.date}`);
+        return { id: battle.id, date: data.date, status: battle.status, markets_count: data.markets.length };
     }
 
     /**
-     * Resolve a Daily 5 battle
+     * Resolve a Daily battle
      */
     async resolveDailyBattle(battleId: string, resolutions: Array<{ dailyBattleMarketId: string; outcome: string }>) {
         const battle = await this.prisma.dailyBattle.findUnique({
@@ -129,6 +129,7 @@ export class AdminService {
         if (battle.status === 'resolved') throw new AppError('Battle already resolved', 409);
 
         let homerScore = 0;
+        const totalMarkets = battle.markets.length;
         const userScores: Record<string, number> = {};
 
         for (const resolution of resolutions) {
@@ -162,15 +163,15 @@ export class AdminService {
         let perfectScores = 0;
 
         for (const [userId, score] of Object.entries(userScores)) {
-            if (score >= 4) {
-                await this.awardXP(userId, 50, 'daily5_high_score', { score, battleId });
+            if (score >= totalMarkets * 0.8 && score < totalMarkets) {
+                await this.awardXP(userId, 50, 'daily_high_score', { score, battleId });
             }
-            if (score === 5) {
-                await this.awardXP(userId, 250, 'daily5_perfect', { battleId });
+            if (score === totalMarkets) {
+                await this.awardXP(userId, 250, 'daily_perfect', { battleId });
                 perfectScores++;
             }
             if (score > homerScore) {
-                await this.awardXP(userId, 100, 'daily5_beat_homer', { battleId, userScore: score, homerScore });
+                await this.awardXP(userId, 100, 'daily_beat_homer', { battleId, userScore: score, homerScore });
                 usersWhoBeatHomer++;
             }
         }
@@ -184,7 +185,7 @@ export class AdminService {
         return {
             battle_id: battleId,
             status: 'resolved',
-            homer_score: `${homerScore}/5`,
+            homer_score: `${homerScore}/${totalMarkets}`,
             users_who_beat_homer: usersWhoBeatHomer,
             perfect_scores: perfectScores,
         };

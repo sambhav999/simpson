@@ -47,7 +47,7 @@ export default function DailyPage() {
         <div className="min-h-screen pb-24 px-4 pt-6">
             {/* Header */}
             <div className="text-center mb-6">
-                <h1 className="text-3xl font-bold">⚡ Daily 5</h1>
+                <h1 className="text-3xl font-bold">⚡ Daily</h1>
                 <p className="text-gray-400 text-sm mt-1">Beat Homer Baba • Win Bonus XP</p>
                 {battle?.date && <p className="text-xs text-gray-500 mt-1">{new Date(battle.date).toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' })}</p>}
             </div>
@@ -80,7 +80,7 @@ export default function DailyPage() {
             {!battle?.markets?.length ? (
                 <div className="glass rounded-2xl p-8 text-center">
                     <p className="text-4xl mb-4">🔮</p>
-                    <p className="text-gray-400">No Daily 5 battle today. Check back tomorrow!</p>
+                    <p className="text-gray-400">No Daily battle today. Check back tomorrow!</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -149,7 +149,7 @@ export default function DailyPage() {
 
             {/* Leaderboard Toggle */}
             <button onClick={() => setShowLeaderboard(!showLeaderboard)} className="mt-6 w-full text-center text-sm text-purple-400 hover:text-purple-300 transition-colors">
-                {showLeaderboard ? 'Hide' : 'Show'} Daily 5 Leaderboard
+                {showLeaderboard ? 'Hide' : 'Show'} Daily Leaderboard
             </button>
 
             {showLeaderboard && leaderboard?.leaderboard && (

@@ -69,7 +69,7 @@ export default function LandingPage() {
                 </h1>
                 <p className="text-xl text-gray-300 mb-2 font-medium">Discover. Predict. Flex.</p>
                 <p className="text-sm text-gray-500 mb-10 max-w-xs mx-auto">
-                    Swipe through prediction markets, follow Homer Baba's AI calls, and compete on the Daily 5.
+                    Swipe through prediction markets, follow Homer Baba's AI calls, and compete on the Daily challenges.
                 </p>
 
                 {/* Feature cards */}
@@ -84,7 +84,7 @@ export default function LandingPage() {
                     </div>
                     <div className="glass rounded-xl p-3">
                         <p className="text-2xl mb-1">⚡</p>
-                        <p className="text-xs text-gray-400">Daily 5</p>
+                        <p className="text-xs text-gray-400">Daily</p>
                     </div>
                 </div>
 

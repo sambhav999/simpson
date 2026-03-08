@@ -49,7 +49,7 @@ export default function AIScoreboardPage() {
                 </div>
             </div>
 
-            {/* Homer vs Community (Daily 5) */}
+            {/* Homer vs Community (Daily) */}
             {scoreboard?.all_time && (
                 <div className="glass rounded-2xl p-5 mb-6">
                     <h3 className="font-semibold mb-4 text-center">🤖 Homer vs 🧠 Community</h3>
@@ -89,8 +89,8 @@ export default function AIScoreboardPage() {
                             className="glass rounded-xl p-4 cursor-pointer hover:bg-white/5 transition-colors">
                             <div className="flex items-start gap-3">
                                 <span className={`mt-1 px-3 py-1 rounded-full text-sm font-bold ${p.result === 'WIN' ? 'bg-emerald-500/20 text-emerald-400' :
-                                        p.result === 'LOSS' ? 'bg-red-500/20 text-red-400' :
-                                            'bg-purple-500/20 text-purple-300'
+                                    p.result === 'LOSS' ? 'bg-red-500/20 text-red-400' :
+                                        'bg-purple-500/20 text-purple-300'
                                     }`}>
                                     {p.prediction}
                                 </span>
