@@ -25,7 +25,6 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
                     orderBy: { position: 'asc' },
                 },
             },
-            orderBy: { date: 'desc' },
         });
 
         if (!battle) {
