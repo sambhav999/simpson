@@ -224,9 +224,27 @@ export class AggregatorService {
 
     private async fetchMyriadMarkets(): Promise<AggregatedMarket[]> {
         try {
+            // Myriad SDK requires WEB3_PROVIDER to be set in env.
+            // If missing, we provide a default devnet fallback to prevent constructor crash.
+            if (!process.env.WEB3_PROVIDER) {
+                process.env.WEB3_PROVIDER = 'https://api.devnet.solana.com';
+            }
+
             const myriadClient = new MyriadClient();
-            const response = await myriadClient.myriad.fetchMarkets({ status: 'open' as any });
+
+            // The Myriad API may require a token or return empty if not authenticated.
+            // We wrap this in a try-catch to ensure one failed source doesn't block the aggregator.
+            const response = await myriadClient.myriad.fetchMarkets({ status: 'open' as any }).catch(e => {
+                logger.warn(`Myriad SDK fetchMarkets failed: ${e.message}`);
+                return { data: [] };
+            });
+
             const markets = response?.data || [];
+
+            if (markets.length === 0) {
+                logger.info('Myriad: SDK returned 0 markets');
+                return [];
+            }
 
             const parsedMarkets: AggregatedMarket[] = markets.map((m: any) => {
                 return {
