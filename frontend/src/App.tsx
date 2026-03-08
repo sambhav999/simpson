@@ -230,14 +230,16 @@ function App() {
     setLoading(true);
     setError(null);
     try {
+      const token = localStorage.getItem('auth_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const fetches = [
         fetch(`${API}/api/daily`, { headers }),
         fetch(`${API}/api/daily/scoreboard`)
       ];
 
-      if (walletAddress) {
-        headers['Authorization'] = `Bearer ${walletAddress}`;
+      if (token) {
         fetches.push(fetch(`${API}/api/daily/user/stats`, { headers }));
       }
 
@@ -996,8 +998,12 @@ function DailyChallengesView({
     setUserPredictions((prev: any) => ({ ...prev, [marketId]: prediction }));
   };
 
-  const submitPredictions = async () => {
-    if (!walletAddress) return;
+  const submitDailyPredictions = async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      alert("Please connect wallet and sign in first.");
+      return;
+    }
     const predictionsArray = Object.entries(userPredictions).map(([marketId, prediction]) => ({
       daily_battle_market_id: marketId,
       prediction
@@ -1007,7 +1013,7 @@ function DailyChallengesView({
     try {
       const res = await fetch(`${API}/api/daily/predict`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${walletAddress}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ predictions: predictionsArray })
       });
       if (res.ok) {
