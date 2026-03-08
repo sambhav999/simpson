@@ -157,14 +157,14 @@ export class AggregatorService {
     private async fetchLimitlessMarkets(): Promise<AggregatedMarket[]> {
         const parsedMarkets: AggregatedMarket[] = [];
         let page = 1;
-        const limit = 100;
+        const limit = 25;
         let hasMore = true;
 
         while (hasMore && parsedMarkets.length < 500) {
             try {
                 const response = await this.limitlessClient.get<LimitlessActiveResponse>(
                     `/markets/active`,
-                    { params: { limit, page, sort_by: 'newest' } }
+                    { params: { limit, page } }
                 );
 
                 const { data: markets, totalMarketsCount } = response.data;
