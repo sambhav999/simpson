@@ -320,7 +320,7 @@ function App() {
   return (
     <div className="app">
       <header className="navbar glass-effect">
-        <div className="logo" onClick={() => setCurrentView('markets')} onDoubleClick={() => setCurrentView('admin')}>
+        <div className="logo" onClick={() => setCurrentView('markets')}>
           <span className="logo-icon">📊</span>
           SimPredict
         </div>
@@ -469,6 +469,7 @@ function App() {
               fetchDailyData={fetchDailyData}
               walletAddress={walletAddress}
               setShowWalletSelector={setShowWalletSelector}
+              setCurrentView={setCurrentView}
             />
           )}
 
