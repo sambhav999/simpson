@@ -22,7 +22,7 @@ export default function AdminDashboard() {
         setLoading(true);
         try {
             const data = await fetchAdminUnfeaturedMarkets();
-            setMarkets(data || []);
+            setMarkets(data.markets || []);
         } catch (err) {
             console.error(err);
         } finally {
