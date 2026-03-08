@@ -79,6 +79,33 @@ export class AggregatorService {
     private readonly myriadClient: AxiosInstance;
     private readonly polymarketClient: AxiosInstance;
     private readonly manifoldClient: AxiosInstance;
+    private readonly categoryImages: Record<string, string[]> = {
+        'Crypto': [
+            'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&q=80',
+            'https://images.unsplash.com/photo-1605792657660-596af90370ea?w=800&q=80',
+            'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=800&q=80'
+        ],
+        'Politics': [
+            'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=800&q=80',
+            'https://images.unsplash.com/photo-1541872703-74c5e443d1fe?w=800&q=80',
+            'https://images.unsplash.com/photo-1520690216127-6f7312c3ebe9?w=800&q=80'
+        ],
+        'Sports': [
+            'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800&q=80',
+            'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800&q=80',
+            'https://images.unsplash.com/photo-1541252260730-0412e8e2108e?w=800&q=80'
+        ],
+        'Entertainment': [
+            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&q=80',
+            'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&q=80',
+            'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80'
+        ],
+        'General': [
+            'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80',
+            'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80',
+            'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80'
+        ]
+    };
 
     constructor() {
         const limitlessHeaders: Record<string, string> = {};
@@ -202,7 +229,7 @@ export class AggregatorService {
                         category: (m.categories && m.categories.length > 0)
                             ? m.categories[0]
                             : 'General',
-                        image: m.image || m.creator?.imageURI || undefined,
+                        image: m.image || m.creator?.imageURI || this.getRandomFallback(m.categories?.[0] || 'General'),
                         volume: m.volumeFormatted || undefined,
                         liquidity: m.liquidityFormatted || undefined,
                         prices: m.prices || undefined,
@@ -256,7 +283,7 @@ export class AggregatorService {
                     expiry: m.expiresAt || m.expirationDate || null,
                     status: m.status === 'open' ? 'active' : m.status,
                     category: m.category?.name || m.category || 'Myriad',
-                    image: m.imageUrl || m.image || undefined,
+                    image: m.imageUrl || m.image || this.getRandomFallback(m.category?.name || m.category || 'Myriad'),
                     volume: m.volume?.total || m.volumeFormatted || undefined,
                     liquidity: m.liquidity?.total || m.liquidityFormatted || undefined,
                     prices: m.prices || undefined,
@@ -293,7 +320,7 @@ export class AggregatorService {
                 expiry: m.closeTime ? new Date(m.closeTime).toISOString() : null,
                 status: m.isResolved ? 'resolved' : 'active',
                 category: (m.groupSlugs && m.groupSlugs.length > 0) ? m.groupSlugs[0] : 'Manifold',
-                image: m.coverImageUrl || undefined,
+                image: m.coverImageUrl || this.getRandomFallback((m.groupSlugs && m.groupSlugs.length > 0) ? m.groupSlugs[0] : 'Manifold'),
                 volume: m.volume ? String(Math.round(m.volume)) : undefined,
                 liquidity: m.totalLiquidity ? String(Math.round(m.totalLiquidity)) : undefined,
                 prices: (typeof m.probability === 'number') ? [m.probability, 1 - m.probability] : undefined,
@@ -351,7 +378,7 @@ export class AggregatorService {
                             expiry: market.endDate || event.endDate || new Date(Date.now() + 86400000).toISOString(),
                             status: market.active ? 'active' : 'inactive',
                             category: (event.tags && event.tags.length > 0) ? event.tags[0].label || event.tags[0] : 'Polymarket',
-                            image: market.image || market.icon || event.image || event.icon || undefined,
+                            image: market.image || market.icon || event.image || event.icon || this.getRandomFallback((event.tags && event.tags.length > 0) ? event.tags[0].label || event.tags[0] : 'Polymarket'),
                         });
                     }
                 }
@@ -438,5 +465,14 @@ export class AggregatorService {
         if (params.amount <= 0) {
             throw new AppError('Amount must be greater than 0', 400);
         }
+    }
+
+    private getRandomFallback(category: string): string {
+        const cat = category.includes('Politics') ? 'Politics' :
+            category.includes('Crypto') ? 'Crypto' :
+                category.includes('Sports') ? 'Sports' :
+                    category.includes('Entertainment') ? 'Entertainment' : 'General';
+        const images = this.categoryImages[cat] || this.categoryImages['General'];
+        return images[Math.floor(Math.random() * images.length)];
     }
 }

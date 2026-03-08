@@ -43,6 +43,7 @@ export class PredictionsService {
                     id: p.market.id,
                     question: p.market.title,
                     closes_at: p.market.closesAt || p.market.expiry,
+                    image: p.market.image,
                 },
                 prediction: p.prediction,
                 confidence: p.confidence,

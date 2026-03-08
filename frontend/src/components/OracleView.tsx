@@ -28,7 +28,8 @@ export default function OracleView({ predictions, stats, loading, onMarketClick 
                     {predictions.map((p: any) => (
                         <div key={p.id} className="daily-card aura-border" style={{ padding: '1.5rem', cursor: 'pointer' }} onClick={() => onMarketClick(p.market)}>
                             <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
-                                <div style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)'}`, textAlign: 'center' }}>
+                                <div className="oracle-market-img" style={{ backgroundImage: `url(${p.market.image || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80'})` }}></div>
+                                <div style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)'}`, textAlign: 'center', minWidth: '80px' }}>
                                     <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)' }}>{p.prediction}</div>
                                 </div>
                                 <div style={{ flex: 1 }}>

@@ -43,7 +43,7 @@ interface PaginationInfo {
 
 interface AIPrediction {
   id: string;
-  market: { id: string; question: string; closes_at: string };
+  market: { id: string; question: string; closes_at: string; image?: string };
   prediction: 'YES' | 'NO';
   confidence: number;
   commentary: string;
@@ -272,7 +272,10 @@ function App() {
   const [qrUri] = useState('');
 
   const getQuote = async () => {
-    if (!selectedMarket || !amount) return;
+    if (!selectedMarket || !amount || !walletAddress) {
+      setQuoteError('Please connect your wallet first.');
+      return;
+    }
     setQuoteLoading(true);
     setQuoteError(null);
     try {
@@ -288,7 +291,7 @@ function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        setQuote(data.quote);
+        setQuote(data.data);
       } else {
         const err = await res.json();
         setQuoteError(err.message || 'Failed to get quote');
@@ -371,6 +374,7 @@ function App() {
                     {aiPredictions.slice(0, 3).map(p => (
                       <div key={p.id} className="featured-card glass-effect" onClick={() => handleMarketClick(p.market as any)}>
                         <div className="card-badge">HIGH CONFIDENCE {p.confidence}%</div>
+                        <div className="featured-card-image" style={{ backgroundImage: `url(${p.market.image || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80'})` }}></div>
                         <h3>{p.market.question}</h3>
                         <div className="card-prediction">Baba Suggests: <span className={p.prediction}>{p.prediction}</span></div>
                         <p className="card-commentary">"{p.commentary.slice(0, 80)}..."</p>

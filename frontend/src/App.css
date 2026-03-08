@@ -2163,3 +2163,23 @@
 .aura-border:hover::before {
   opacity: 0.3;
 }
+
+.featured-card-image {
+  height: 140px;
+  width: 100%;
+  background-size: cover;
+  background-position: center;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.oracle-market-img, .arena-market-img {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
