@@ -234,7 +234,7 @@ export class AggregatorService {
 
             // The Myriad API may require a token or return empty if not authenticated.
             // We wrap this in a try-catch to ensure one failed source doesn't block the aggregator.
-            const response = await myriadClient.myriad.fetchMarkets({ status: 'open' as any }).catch(e => {
+            const response = await myriadClient.myriad.fetchMarkets({ status: 'open' as any }).catch((e: any) => {
                 logger.warn(`Myriad SDK fetchMarkets failed: ${e.message}`);
                 return { data: [] };
             });
