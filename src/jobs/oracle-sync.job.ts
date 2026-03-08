@@ -2,7 +2,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import { PrismaService } from '../core/config/prisma.service';
 import { HermesClient } from '@pythnetwork/hermes-client';
 import { logger } from '../core/logger/logger';
-import { config } from '../core/config/config';
+import { RedisService } from '../core/config/redis.service';
 
 const QUEUE_NAME = 'oracle-sync';
 const JOB_NAME = 'sync-oracles';
@@ -23,7 +23,7 @@ export class OracleSyncJob {
     constructor() {
         this.prisma = PrismaService.getInstance();
 
-        const connection = { url: config.REDIS_URL };
+        const connection = RedisService.getBullMQConnection();
         this.queue = new Queue(QUEUE_NAME, { connection });
 
         // Using Hermes public endpoint for Pyth

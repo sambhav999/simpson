@@ -3,6 +3,7 @@ import { PrismaService } from '../core/config/prisma.service';
 import { SolanaService } from '../modules/solana/solana.service';
 import { AlertService } from '../core/logger/alert.service';
 import { logger } from '../core/logger/logger';
+import { RedisService } from '../core/config/redis.service';
 import { config } from '../core/config/config';
 
 const QUEUE_NAME = 'fee-reconciliation';
@@ -21,7 +22,7 @@ export class FeeReconciliationJob {
         this.solana = SolanaService.getInstance();
         this.alertService = new AlertService();
 
-        const connection = { url: config.REDIS_URL };
+        const connection = RedisService.getBullMQConnection();
         this.queue = new Queue(QUEUE_NAME, { connection });
 
         this.worker = new Worker(

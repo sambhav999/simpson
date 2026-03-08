@@ -3,7 +3,7 @@ import { PortfolioService } from '../modules/portfolio/portfolio.service';
 import { PrismaService } from '../core/config/prisma.service';
 import { LeaderboardService } from '../modules/leaderboard/leaderboard.service';
 import { logger } from '../core/logger/logger';
-import { config } from '../core/config/config';
+import { RedisService } from '../core/config/redis.service';
 const QUEUE_NAME = 'portfolio-sync';
 const JOB_NAME = 'sync-portfolios';
 const REPEAT_INTERVAL_MS = 30_000;
@@ -18,7 +18,7 @@ export class PortfolioSyncJob {
     this.portfolioService = new PortfolioService();
     this.leaderboardService = new LeaderboardService();
     this.prisma = PrismaService.getInstance();
-    const connection = { url: config.REDIS_URL };
+    const connection = RedisService.getBullMQConnection();
     this.queue = new Queue(QUEUE_NAME, { connection });
     this.worker = new Worker(
       QUEUE_NAME,

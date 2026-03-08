@@ -1,7 +1,7 @@
 ﻿import { Queue, Worker, Job } from 'bullmq';
 import { MarketsService } from '../modules/markets/markets.service';
 import { logger } from '../core/logger/logger';
-import { config } from '../core/config/config';
+import { RedisService } from '../core/config/redis.service';
 const QUEUE_NAME = 'market-sync';
 const JOB_NAME = 'sync-markets';
 const REPEAT_INTERVAL_MS = 60_000;
@@ -11,7 +11,7 @@ export class MarketSyncJob {
   private marketsService: MarketsService;
   constructor() {
     this.marketsService = new MarketsService();
-    const connection = { url: config.REDIS_URL };
+    const connection = RedisService.getBullMQConnection();
     this.queue = new Queue(QUEUE_NAME, { connection });
     this.worker = new Worker(
       QUEUE_NAME,
