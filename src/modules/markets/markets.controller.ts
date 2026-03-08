@@ -17,6 +17,7 @@ marketsRouter.get('/', async (req: Request, res: Response, next: NextFunction) =
         status: status as string | undefined,
         category: category as string | undefined,
         search: search as string | undefined,
+        source: source as string | undefined,
       },
       {
         page: page ? Number(page) : undefined,
@@ -24,6 +25,17 @@ marketsRouter.get('/', async (req: Request, res: Response, next: NextFunction) =
       }
     );
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+// POST /markets/sync — Manually trigger market sync from all aggregator sources
+marketsRouter.post('/sync', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await marketsService.syncMarketsFromAggregator();
+    res.json({ message: 'Market sync completed', ...result });
   } catch (error) {
     next(error);
   }

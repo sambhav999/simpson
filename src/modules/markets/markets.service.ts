@@ -1,5 +1,5 @@
 ﻿import { MarketsRepository, MarketFilter, PaginationParams } from './markets.repository';
-import { AggregatorService, DFlowMarket as AggregatedMarket } from '../markets-aggregator/aggregator.service';
+import { AggregatorService, AggregatedMarket } from '../markets-aggregator/aggregator.service';
 import { RedisService } from '../../core/config/redis.service';
 import { logger } from '../../core/logger/logger';
 import { AppError } from '../../core/config/error.handler';
@@ -62,9 +62,11 @@ export class MarketsService {
   private normalizeCategory(rawCat?: string): string {
     if (!rawCat) return 'General';
     const lower = rawCat.toLowerCase();
-    if (lower.includes('crypto') || lower.includes('token') || lower.includes('btc') || lower.includes('sol')) return 'Crypto';
-    if (lower.includes('sport') || lower.includes('nfl') || lower.includes('nba')) return 'Sports';
-    if (lower.includes('politic') || lower.includes('election')) return 'Politics';
+    if (lower.includes('crypto') || lower.includes('token') || lower.includes('btc') || lower.includes('sol') || lower.includes('doge') || lower.includes('eth')) return 'Crypto';
+    if (lower.includes('sport') || lower.includes('nfl') || lower.includes('nba') || lower.includes('soccer') || lower.includes('football')) return 'Sports';
+    if (lower.includes('politic') || lower.includes('election') || lower.includes('vote')) return 'Politics';
+    if (lower.includes('hourly') || lower.includes('daily') || lower.includes('weekly')) return 'Crypto'; // Limitless recurring price markets
+    if (lower.includes('entertainment') || lower.includes('culture') || lower.includes('pop')) return 'Entertainment';
     return 'General';
   }
 

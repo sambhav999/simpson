@@ -1,10 +1,11 @@
 ﻿import { PrismaService } from '../../core/config/prisma.service';
-import { DFlowMarket } from '../markets-aggregator/aggregator.service';
+import { AggregatedMarket } from '../markets-aggregator/aggregator.service';
 import { logger } from '../../core/logger/logger';
 export interface MarketFilter {
   status?: string;
   category?: string;
   search?: string;
+  source?: string;
 }
 export interface PaginationParams {
   page?: number;
@@ -15,7 +16,7 @@ export class MarketsRepository {
   constructor() {
     this.prisma = PrismaService.getInstance();
   }
-  async upsertMarket(market: DFlowMarket) {
+  async upsertMarket(market: AggregatedMarket) {
     return this.prisma.market.upsert({
       where: { externalId: market.id },
       create: {
@@ -28,6 +29,9 @@ export class MarketsRepository {
         status: market.status,
         category: market.category,
         image: market.image,
+        source: market.source || 'polymarket',
+        volume: market.volume ? parseFloat(market.volume) : undefined,
+        liquidity: market.liquidity ? parseFloat(market.liquidity) : undefined,
       },
       update: {
         title: market.title,
@@ -36,10 +40,13 @@ export class MarketsRepository {
         expiry: market.expiry ? new Date(market.expiry) : null,
         category: market.category,
         image: market.image,
+        source: market.source || undefined,
+        volume: market.volume ? parseFloat(market.volume) : undefined,
+        liquidity: market.liquidity ? parseFloat(market.liquidity) : undefined,
       },
     });
   }
-  async upsertMany(markets: DFlowMarket[]) {
+  async upsertMany(markets: AggregatedMarket[]) {
     let updated = 0;
     let created = 0;
     const changedIds: string[] = [];
@@ -60,13 +67,14 @@ export class MarketsRepository {
     return { created, updated, changedIds };
   }
   async findAll(filter: MarketFilter = {}, pagination: PaginationParams = {}) {
-    const { status, category, search } = filter;
+    const { status, category, search, source } = filter;
     const page = Math.max(1, pagination.page || 1);
     const limit = Math.min(100, Math.max(1, pagination.limit || 20));
     const skip = (page - 1) * limit;
     const where: Record<string, unknown> = {};
     if (status) where['status'] = status;
     if (category) where['category'] = category;
+    if (source) where['source'] = source;
     if (search) {
       where['OR'] = [
         { title: { contains: search, mode: 'insensitive' } },

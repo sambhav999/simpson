@@ -4,9 +4,42 @@ import { config } from '../../core/config/config';
 import { logger } from '../../core/logger/logger';
 import { AppError } from '../../core/config/error.handler';
 
-// Reusing the same interface names for now to minimize changes in other files, 
-// though they should ideally be renamed to something like AggregatedMarket
-export interface DFlowMarket {
+// Shape returned by the Limitless /markets/active endpoint
+interface LimitlessMarketResponse {
+    id: number;
+    address: string;
+    conditionId: string;
+    title: string;
+    description: string;
+    collateralToken: { address: string; decimals: number; symbol: string };
+    creator: { name: string; imageURI: string; link: string };
+    prices: number[];           // [yesPrice, noPrice]
+    categories: string[];
+    tags: string[];
+    status: string;             // "FUNDED", etc.
+    expired: boolean;
+    expirationDate: string;
+    expirationTimestamp: number;
+    volume: string;
+    volumeFormatted: string;
+    openInterest?: string;
+    openInterestFormatted?: string;
+    liquidity: string;
+    liquidityFormatted: string;
+    tradeType: string;          // "amm" | "clob" | "group"
+    marketType: string;         // "single" | "group"
+    slug: string;
+    image?: string;
+    feedEvents?: unknown[];
+}
+
+interface LimitlessActiveResponse {
+    data: LimitlessMarketResponse[];
+    totalMarketsCount: number;
+}
+
+// Normalized market shape used across all aggregator sources
+export interface AggregatedMarket {
     id: string;
     title: string;
     description: string;
@@ -17,6 +50,10 @@ export interface DFlowMarket {
     category: string;
     source?: 'limitless' | 'myriad' | 'polymarket';
     image?: string;
+    volume?: string;
+    liquidity?: string;
+    prices?: number[];
+    slug?: string;
 }
 
 export interface TradeQuoteParams {
@@ -41,16 +78,20 @@ export class AggregatorService {
     private readonly polymarketClient: AxiosInstance;
 
     constructor() {
-        this.limitlessClient = this.createClient(config.LIMITLESS_API_URL);
+        const limitlessHeaders: Record<string, string> = {};
+        if (config.LIMITLESS_API_KEY) {
+            limitlessHeaders['X-API-Key'] = config.LIMITLESS_API_KEY;
+        }
+        this.limitlessClient = this.createClient(config.LIMITLESS_API_URL, limitlessHeaders);
         this.myriadClient = this.createClient(config.MYRIAD_API_URL);
         this.polymarketClient = this.createClient(config.POLYMARKET_API_URL);
     }
 
-    private createClient(baseURL: string): AxiosInstance {
+    private createClient(baseURL: string, extraHeaders: Record<string, string> = {}): AxiosInstance {
         const client = axios.create({
             baseURL,
-            timeout: 10000,
-            headers: { 'Content-Type': 'application/json' },
+            timeout: 15000,
+            headers: { 'Content-Type': 'application/json', ...extraHeaders },
         });
 
         axiosRetry(client, {
@@ -67,7 +108,7 @@ export class AggregatorService {
         return client;
     }
 
-    async getMarkets(): Promise<DFlowMarket[]> {
+    async getMarkets(): Promise<AggregatedMarket[]> {
         try {
             logger.debug('Fetching markets from Aggregator APIs (Limitless, Myriad, Polymarket)');
 
@@ -79,7 +120,7 @@ export class AggregatorService {
                 this.fetchPolymarketMarkets()
             ]);
 
-            const allMarkets: DFlowMarket[] = [];
+            const allMarkets: AggregatedMarket[] = [];
 
             if (limitlessRes.status === 'fulfilled') {
                 allMarkets.push(...limitlessRes.value.map(m => ({ ...m, source: 'limitless' as const })));
@@ -108,71 +149,78 @@ export class AggregatorService {
         }
     }
 
-    // Placeholder methods for individual market fetching - these would be adapted to actual API structures
-    private async fetchLimitlessMarkets(): Promise<DFlowMarket[]> {
-        try {
-            // Mocking the endpoint with requested markets
-            return [
-                {
-                    id: 'MOCK-CRYPTO-1',
-                    title: 'Will Bitcoin reach $100k by end of year?',
-                    description: 'Predicting if the BTC/USD pair will touch or exceed the $100,000 mark before Dec 31st.',
-                    yesTokenMint: 'YESBTC100kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    noTokenMint: 'NOBTC100kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    expiry: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-                    status: 'active',
-                    category: 'Crypto',
-                    image: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=800&auto=format&fit=crop&q=60',
-                },
-                {
-                    id: 'MOCK-BULL-BEAR-1',
-                    title: 'Bullish vs Bearish: Tech Sector 2026',
-                    description: 'Will the Tech sector overall perform bullishly compared to current averages?',
-                    yesTokenMint: 'YESBULLTECHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    noTokenMint: 'NOBEARTECHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    expiry: new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString(),
-                    status: 'active',
-                    category: 'Finance',
-                    image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=60',
-                },
-                {
-                    id: 'MOCK-FLIGHT-1',
-                    title: 'Air Traffic Passenger Volume > 4 Billion?',
-                    description: 'Will global air traffic surpass 4 billion passengers this year?',
-                    yesTokenMint: 'YESAIRTRAFFICxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    noTokenMint: 'NOAIRTRAFFICxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    expiry: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString(),
-                    status: 'active',
-                    category: 'Travel',
-                    image: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&auto=format&fit=crop&q=60',
-                },
-                {
-                    id: 'MOCK-TECH-1',
-                    title: 'Will OpenAI release GPT-5 before July?',
-                    description: 'Predict whether a major version upgrade to GPT-5 will be announced.',
-                    yesTokenMint: 'YESGPT5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    noTokenMint: 'NOGPT5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    expiry: '2026-07-01T00:00:00.000Z',
-                    status: 'active',
-                    category: 'Technology',
-                    image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&auto=format&fit=crop&q=60',
-                },
-                {
-                    id: 'MOCK-SPORTS-1',
-                    title: 'NBA Finals 2026: Eastern Conference Winner?',
-                    description: 'Will the Boston Celtics win the Eastern Conference?',
-                    yesTokenMint: 'YESCELTICSxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    noTokenMint: 'NOCELTICSxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                    expiry: '2026-06-01T00:00:00.000Z',
-                    status: 'active',
-                    category: 'Sports',
-                    image: 'https://images.unsplash.com/photo-1504450758481-7338eba7524a?w=800&auto=format&fit=crop&q=60',
+    /**
+     * Fetches real market data from the Limitless Exchange API.
+     * Paginates through all active markets (up to 500) and maps them
+     * to our internal AggregatedMarket shape.
+     */
+    private async fetchLimitlessMarkets(): Promise<AggregatedMarket[]> {
+        const parsedMarkets: AggregatedMarket[] = [];
+        let page = 1;
+        const limit = 100;
+        let hasMore = true;
+
+        while (hasMore && parsedMarkets.length < 500) {
+            try {
+                const response = await this.limitlessClient.get<LimitlessActiveResponse>(
+                    `/markets/active`,
+                    { params: { limit, page, sort_by: 'newest' } }
+                );
+
+                const { data: markets, totalMarketsCount } = response.data;
+
+                if (!Array.isArray(markets) || markets.length === 0) {
+                    hasMore = false;
+                    break;
                 }
-            ];
-        } catch (err) { throw err; }
+
+                for (const m of markets) {
+                    // Skip expired markets
+                    if (m.expired) continue;
+
+                    parsedMarkets.push({
+                        id: `LMT-${m.id}`,
+                        title: m.title || `Limitless Market #${m.id}`,
+                        description: m.description || '',
+                        yesTokenMint: m.address,
+                        noTokenMint: m.conditionId,
+                        expiry: m.expirationTimestamp
+                            ? new Date(m.expirationTimestamp).toISOString()
+                            : null,
+                        status: m.status === 'FUNDED' ? 'active' : m.status.toLowerCase(),
+                        category: (m.categories && m.categories.length > 0)
+                            ? m.categories[0]
+                            : 'General',
+                        image: m.image || m.creator?.imageURI || undefined,
+                        volume: m.volumeFormatted || undefined,
+                        liquidity: m.liquidityFormatted || undefined,
+                        prices: m.prices || undefined,
+                        slug: m.slug || undefined,
+                    });
+                }
+
+                // Check if we've fetched all available markets
+                if (parsedMarkets.length >= totalMarketsCount || markets.length < limit) {
+                    hasMore = false;
+                } else {
+                    page++;
+                }
+
+                logger.debug(`Limitless: fetched page ${page - 1}, got ${markets.length} markets (total so far: ${parsedMarkets.length})`);
+            } catch (err) {
+                const message = err instanceof Error ? err.message : 'Unknown error';
+                logger.error(`Limitless API error on page ${page}: ${message}`);
+                // If first page fails, throw. If later pages fail, return what we have.
+                if (page === 1) throw err;
+                hasMore = false;
+            }
+        }
+
+        logger.info(`Limitless: fetched ${parsedMarkets.length} active markets total`);
+        return parsedMarkets;
     }
 
-    private async fetchMyriadMarkets(): Promise<DFlowMarket[]> {
+    private async fetchMyriadMarkets(): Promise<AggregatedMarket[]> {
         try {
             // const response = await this.myriadClient.get('/markets');
             // return response.data;
@@ -180,9 +228,9 @@ export class AggregatorService {
         } catch (err) { throw err; }
     }
 
-    private async fetchPolymarketMarkets(): Promise<DFlowMarket[]> {
+    private async fetchPolymarketMarkets(): Promise<AggregatedMarket[]> {
         try {
-            const parsedMarkets: DFlowMarket[] = [];
+            const parsedMarkets: AggregatedMarket[] = [];
             let offset = 0;
             const limit = 100;
             let hasMore = true;
@@ -244,7 +292,7 @@ export class AggregatorService {
     }
 
 
-    async getMarketById(marketId: string): Promise<DFlowMarket | null> {
+    async getMarketById(marketId: string): Promise<AggregatedMarket | null> {
         try {
             // In a real implementation, you might need to try all three or encode the source in the ID
             // For now, simulating a fetch

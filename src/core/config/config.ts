@@ -6,6 +6,7 @@ const envSchema = z.object({
   HELIUS_RPC_URL: z.string().url(),
   SOLANA_NETWORK: z.enum(['mainnet-beta', 'devnet', 'testnet']).default('mainnet-beta'),
   LIMITLESS_API_URL: z.string().url(),
+  LIMITLESS_API_KEY: z.string().optional(),
   MYRIAD_API_URL: z.string().url(),
   POLYMARKET_API_URL: z.string().url(),
   PORT: z.coerce.number().default(3000),
