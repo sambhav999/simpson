@@ -1780,3 +1780,386 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+/* =========================================================================
+   MODERNIZED UI & UTILITIES
+   ========================================================================= */
+
+.glass-effect {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navbar {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  height: 70px;
+  padding: 0 2rem;
+}
+
+.logo {
+  cursor: pointer;
+  user-select: none;
+}
+
+.nav-links {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav-links button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-links button:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-links button.active {
+  color: white;
+  background: rgba(59, 130, 246, 0.15);
+  box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.1);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.market-count-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-right: 1px solid var(--border);
+  padding-right: 1.5rem;
+}
+
+.market-count-badge .count {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.market-count-badge .label {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.wallet-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.balance-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 6px 12px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--accent-green);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.sol-icon { color: var(--accent-cyan); font-weight: bold; }
+
+.user-profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: var(--radius-xl);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-profile-btn:hover {
+  border-color: var(--accent-purple);
+  background: var(--bg-card-hover);
+}
+
+.disconnect-icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 4px;
+  transition: color 0.2s ease;
+}
+
+.disconnect-icon-btn:hover { color: var(--accent-red); }
+
+/* Featured / Oracle Grid */
+.featured-section {
+  margin-bottom: 3.5rem;
+  margin-top: 2rem;
+}
+
+.oracle-glow {
+  position: relative;
+}
+
+.oracle-glow::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 40px;
+  background: var(--oracle-glow);
+  filter: blur(60px);
+  z-index: -1;
+  border-radius: 50%;
+  opacity: 0.4;
+}
+
+.featured-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.view-all-btn {
+  background: none;
+  border: none;
+  color: var(--accent-purple);
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: opacity 0.2s ease;
+}
+
+.view-all-btn:hover { opacity: 0.8; }
+
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.featured-card {
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(139, 92, 246, 0.1);
+  background: rgba(30, 27, 75, 0.3);
+}
+
+.featured-card:hover {
+  transform: translateY(-8px);
+  border-color: var(--accent-purple);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(139, 92, 246, 0.2);
+  background: rgba(30, 27, 75, 0.5);
+}
+
+.card-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: var(--accent-purple);
+  background: rgba(139, 92, 246, 0.15);
+  padding: 4px 12px;
+  border-radius: 4px;
+  margin-bottom: 1.25rem;
+  letter-spacing: 1px;
+}
+
+.card-prediction {
+  margin: 1.25rem 0;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.card-prediction .YES { color: var(--accent-green); text-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
+.card-prediction .NO { color: var(--accent-red); text-shadow: 0 0 10px rgba(239, 68, 68, 0.3); }
+
+.card-commentary {
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Filters UI Modernized */
+.filters-container {
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  margin-bottom: 3rem;
+  border: 1px solid var(--border);
+}
+
+.filters-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.category-scroll {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.category-scroll::-webkit-scrollbar { display: none; }
+
+.cat-btn, .src-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 10px 20px;
+  border-radius: var(--radius-xl);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.cat-btn:hover, .src-btn:hover {
+  border-color: var(--border-hover);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cat-btn.active, .src-btn.active {
+  background: var(--accent-blue);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Redefined Market Grid and Cards */
+.markets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 2rem;
+}
+
+.market-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.market-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-card);
+}
+
+.market-image {
+  height: 200px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.market-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 0%, rgba(10, 14, 23, 0.8) 100%);
+}
+
+.source-tag {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(10, 14, 23, 0.7);
+  backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  z-index: 10;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.market-card-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.market-card-content h3 {
+  font-size: 1.15rem;
+  line-height: 1.5;
+  margin-bottom: 2rem;
+  font-weight: 700;
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.market-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.category-tag {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--accent-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Aura Border Trick */
+.aura-border {
+  position: relative;
+  border: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.aura-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.aura-border:hover::before {
+  opacity: 0.3;
+}
