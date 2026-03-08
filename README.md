@@ -13,6 +13,7 @@ This application acts as a real-time aggregator for top prediction markets (such
 - **Resilient BullMQ & Redis Connection Pooling**: Refactored the Node.js background processors (`market-sync`, `portfolio-sync`, `fee-reconciliation`, `oracle-sync`) to utilize a unified singleton `IORedis` connection factory. Configured `lazyConnect: true` and `maxRetriesPerRequest: null`, successfully eliminating recursive `ERR max number of clients reached` exhaustion bottlenecks on managed DigitalOcean Redis instances.
 - **Prisma Schema Fallbacks**: Resolved rigid PostgreSQL schema validation errors that caused silent drops during background job loops. Implemented robust data normalization with graceful string fallbacks ('N/A') for missing polymorphic aggregator properties (like `yesTokenMint`), successfully pushing 400+ Limitless markets through the `upsertMany` pipeline transaction.
 - **Manual Sync Webhook**: Appended a new RESTful `POST /markets/sync` controller endpoint enabling on-demand, manual force-triggers bridging the frontend and the multi-source aggregator jobs.
+- **Dynamic "Daily" Challenges & AI Oracle**: Transformed the static "Daily 5" feature into an auto-generating "Daily" challenge where the backend actively selects 10-20 random markets daily. Includes a legendary AI persona, "Homer Baba", competing directly against the community with pre-calculated accuracy ratings.
 
 ---
 
@@ -51,6 +52,8 @@ simpredict-backend/
 
 ### Frontend (React UI)
 - **Markets View:** Browse dynamically synced prediction markets (Polymarket + Limitsless Mocks) with full-bleed premium cover images.
+- **The Daily:** Compete in auto-generated daily challenges (10-20 markets) against the AI Oracle. Unlock Bonus XP multipliers for perfect scores and beating the AI.
+- **AI Oracle 🔮:** A global scoreboard comparing the predictive accuracy of "Homer Baba" against the aggregated community predictions.
 - **Portfolio View:** Track active positions, overall PnL, Total Value, and recent trade history for connected wallets.
 - **Leaderboard View:** See top traders globally, sortable by Highest Streak and Total Volume. Connected user is dynamically highlighted!
 - **Solana Pay Integration:** Instantly generate dynamic Solana Pay QR Codes to seamlessly execute trades from a mobile phantom/solflare wallet!
@@ -58,9 +61,10 @@ simpredict-backend/
 
 ### Backend (Node + Express)
 - **Aggregator Service:** Reaches out to leading API providers to extract, normalize, and cache current prediction events, including their thumbnails and categories!
+- **Auto-Generating Daily Battles:** Intelligent daily cron alternatives that dynamically assemble 10-20 random active markets for user competition.
 - **Solana Pay API:** `GET /trade/pay` and `POST /trade/pay` endpoints that implement the official Solana Pay specification to facilitate secure, gasless signing flows.
 - **High-Performance Caching:** Upstash Redis provides lightning-fast Leaderboard sorting and Market querying.
-- **Prisma ORM:** PostgreSQL schema mapping users, streaks, trade ledgers, and indexer states.
+- **Prisma ORM:** PostgreSQL schema mapping users, streaks, trade ledgers, predict-to-earn progress, and indexer states.
 
 ---
 
