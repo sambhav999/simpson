@@ -70,30 +70,53 @@ simpredict-backend/
 
 ## 🛠️ Environment Setup
 
-You need to define your environment variables in the root `.env` file for the backend.
+You need to define your environment variables in both the root `.env` (Backend) and the `frontend/.env` (Frontend).
+
+### Backend Environment Variables (`/.env`)
 
 ```env
 # Database
-DATABASE_URL=postgresql://user:pass@host:5432/simpredict
+DATABASE_URL="postgresql://user:pass@host:5432/db"
 
 # Redis
-REDIS_URL=rediss://default:pass@host:6379
+REDIS_URL="redis://default:pass@host:port"
 
 # Solana
-HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY
-SOLANA_NETWORK=mainnet-beta
+HELIUS_RPC_URL="https://devnet.helius-rpc.com/?api-key=YOUR_KEY"
+SOLANA_NETWORK=devnet # or mainnet-beta
 
 # Aggregator APIs
 LIMITLESS_API_URL="https://api.limitless.exchange"
+LIMITLESS_API_KEY="" # Optional
 MYRIAD_API_URL="https://api.myriad.markets"
 POLYMARKET_API_URL="https://gamma-api.polymarket.com"
 
-# Server
+# Server Configuration
 PORT=3000
 NODE_ENV=development
+LOG_LEVEL=info
+
+# Authentication
+JWT_SECRET=your-secure-secret
+JWT_EXPIRY=24h
+
+# Cloudflare R2 (Meme Cards)
+R2_ENDPOINT=your-r2-endpoint
+R2_ACCESS_KEY_ID=your-access-key
+R2_SECRET_ACCESS_KEY=your-secret-key
+R2_BUCKET_NAME=simpredicts-cards
+
+# App Link
+APP_URL=http://localhost:5173
 ```
 
-*(Note: The `frontend` directory also has its own `.env` file that points to the backend URL.)*
+### Frontend Environment Variables (`/frontend/.env`)
+
+```env
+VITE_BACKEND_URL=http://localhost:3000
+VITE_POLYMARKET_API_URL=https://gamma-api.polymarket.com
+VITE_SOLANA_RPC_URL=https://devnet.helius-rpc.com/?api-key=YOUR_KEY
+```
 
 ---
 
