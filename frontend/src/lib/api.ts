@@ -94,6 +94,14 @@ export const fetchDailyLeaderboard = () => request<any>('/api/daily/leaderboard'
 export const generateMemeCard = (data: { market_id: string; template: string }) =>
     request<any>('/api/cards/generate', { method: 'POST', body: JSON.stringify(data) });
 
+// Admin
+export const fetchAdminUnfeaturedMarkets = () => request<any>('/api/admin/markets/unfeatured');
+export const createDailyBattle = (data: { date: string, markets: any[] }) =>
+    request<any>('/api/admin/daily/create', { method: 'POST', body: JSON.stringify(data) });
+export const resolveDailyBattle = (id: string, resolutions: any[]) =>
+    request<any>(`/api/admin/daily/${id}/resolve`, { method: 'POST', body: JSON.stringify({ resolutions }) });
+
+
 // Portfolio
 export const fetchPortfolio = (wallet: string) => request<any>(`/portfolio/${wallet}`);
 

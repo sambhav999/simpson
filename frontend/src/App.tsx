@@ -11,6 +11,7 @@ const OracleView = lazy(() => import('./components/OracleView'));
 const DailyChallengesView = lazy(() => import('./components/DailyChallengesView'));
 const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
 const TradeModal = lazy(() => import('./components/TradeModal'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 const API = import.meta.env.VITE_BACKEND_URL;
 
@@ -72,7 +73,7 @@ function App() {
   const [category, setCategory] = useState('All');
   const [source, setSource] = useState('all');
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
-  const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle'>('markets');
+  const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle' | 'admin'>('markets');
 
   // Daily 5 State
   const [dailyBattle, setDailyBattle] = useState<any>(null);
@@ -319,7 +320,7 @@ function App() {
   return (
     <div className="app">
       <header className="navbar glass-effect">
-        <div className="logo" onClick={() => setCurrentView('markets')}>
+        <div className="logo" onClick={() => setCurrentView('markets')} onDoubleClick={() => setCurrentView('admin')}>
           <span className="logo-icon">📊</span>
           SimPredict
         </div>
@@ -478,6 +479,10 @@ function App() {
               loading={aiLoading}
               onMarketClick={handleMarketClick}
             />
+          )}
+
+          {currentView === 'admin' && (
+            <AdminDashboard />
           )}
         </ErrorBoundary>
       </Suspense>
