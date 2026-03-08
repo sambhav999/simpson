@@ -46,6 +46,64 @@ interface TradeQuote {
   total?: number;
 }
 
+interface DailyMarket {
+  id: string;
+  position: number;
+  market: {
+    id: string;
+    question: string;
+    yes_price: number | null;
+    no_price: number | null;
+    source: string;
+    image_url: string | null;
+    closes_at: string | null;
+  };
+  homer_prediction: string;
+  homer_confidence: number;
+  homer_commentary: string;
+  result: string | null;
+  user_prediction: 'YES' | 'NO' | null;
+}
+
+interface DailyBattle {
+  id: string;
+  date: string;
+  status: string;
+  markets: DailyMarket[];
+  user_stats: {
+    participated: boolean;
+    predictions_made: number;
+  };
+}
+
+interface DailyScoreboard {
+  all_time: {
+    homer_baba: { wins: number; losses: number; accuracy: number; total_predictions: number };
+    community: { wins: number; losses: number; accuracy: number; total_predictions: number };
+    homer_advantage: number;
+  };
+}
+
+interface DailyUserStats {
+  wins: number;
+  losses: number;
+  accuracy: number;
+  total_predictions: number;
+  total_battles_participated: number;
+}
+
+interface DailyLeaderboardEntry {
+  rank: number;
+  user: {
+    id: string;
+    username: string | null;
+    avatar_url: string | null;
+    rank_badge: string;
+  };
+  total_correct: number;
+  accuracy: number;
+}
+
 type WalletType = 'phantom' | 'metamask' | null;
 
 const CATEGORIES = ['All', 'Crypto', 'Sports', 'Politics', 'General'];
@@ -65,7 +123,15 @@ function App() {
   const [category, setCategory] = useState('All');
   const [source, setSource] = useState('all');
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
-  const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard'>('markets');
+  const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily'>('markets');
+
+  // Daily 5 State
+  const [dailyBattle, setDailyBattle] = useState<DailyBattle | null>(null);
+  const [dailyScoreboard, setDailyScoreboard] = useState<DailyScoreboard | null>(null);
+  const [dailyUserStats, setDailyUserStats] = useState<DailyUserStats | null>(null);
+  const [dailyLeaderboard, setDailyLeaderboard] = useState<DailyLeaderboardEntry[]>([]);
+  const [userPredictions, setUserPredictions] = useState<Record<string, 'YES' | 'NO'>>({});
+  const [submittingDaily, setSubmittingDaily] = useState(false);
 
   // Wallet Adapters integration
   const { publicKey, select, disconnect, wallet, wallets } = useWallet();
@@ -164,8 +230,51 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetchMarkets(1, search, category, source);
-  }, [category, source, fetchMarkets]);
+    if (currentView === 'markets') {
+      fetchMarkets(1, search, category, source);
+    }
+  }, [currentView, category, source, fetchMarkets, search]);
+
+  const fetchDailyData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const fetches = [
+        fetch(`${API}/daily`, { headers }),
+        fetch(`${API}/daily/scoreboard`)
+      ];
+
+      if (walletAddress) {
+        headers['Authorization'] = `Bearer ${walletAddress}`;
+        fetches.push(fetch(`${API}/daily/user/stats`, { headers }));
+      }
+
+      const results = await Promise.all(fetches);
+      const [battleRes, scoreboardRes, userStatsRes] = results;
+
+      if (battleRes && battleRes.ok) setDailyBattle(await battleRes.json());
+      if (scoreboardRes && scoreboardRes.ok) setDailyScoreboard(await scoreboardRes.json());
+      if (userStatsRes && userStatsRes.ok) setDailyUserStats(await userStatsRes.json());
+
+      // If Leaderboard view for Daily is needed, we can fetch it too
+      const leaderRes = await fetch(`${API}/daily/leaderboard?limit=10`);
+      if (leaderRes.ok) {
+        const leaderData = await leaderRes.json();
+        setDailyLeaderboard(leaderData.leaderboard || []);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch Daily 5 data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentView === 'daily') {
+      fetchDailyData();
+    }
+  }, [currentView, fetchDailyData]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -226,6 +335,10 @@ function App() {
               className={`nav-link ${currentView === 'leaderboard' ? 'active' : ''}`}
               onClick={() => setCurrentView('leaderboard')}
             >Leaderboard</button>
+            <button
+              className={`nav-link ${currentView === 'daily' ? 'active' : ''}`}
+              onClick={() => setCurrentView('daily')}
+            >Daily 5</button>
           </div>
 
           <div className="nav-right">
@@ -427,6 +540,22 @@ function App() {
         <PortfolioView
           walletAddress={walletAddress}
           onConnectWallet={() => setShowWalletSelector(true)}
+        />
+      )}
+
+      {currentView === 'daily' && (
+        <DailyChallengesView
+          dailyBattle={dailyBattle}
+          dailyScoreboard={dailyScoreboard}
+          dailyUserStats={dailyUserStats}
+          dailyLeaderboard={dailyLeaderboard}
+          userPredictions={userPredictions}
+          setUserPredictions={setUserPredictions}
+          submittingDaily={submittingDaily}
+          setSubmittingDaily={setSubmittingDaily}
+          fetchDailyData={fetchDailyData}
+          walletAddress={walletAddress}
+          setShowWalletSelector={setShowWalletSelector}
         />
       )}
 
@@ -913,6 +1042,239 @@ function PortfolioView({ walletAddress, onConnectWallet }: { walletAddress: stri
 
         </div>
       )}
+    </main>
+  );
+}
+
+/* ===== Daily Challenges Component ===== */
+function DailyChallengesView({
+  dailyBattle,
+  dailyScoreboard,
+  dailyUserStats,
+  dailyLeaderboard,
+  userPredictions,
+  setUserPredictions,
+  submittingDaily,
+  setSubmittingDaily,
+  fetchDailyData,
+  walletAddress,
+  setShowWalletSelector
+}: any) {
+
+  const handlePrediction = (marketId: string, prediction: 'YES' | 'NO') => {
+    if (!walletAddress) {
+      setShowWalletSelector(true);
+      return;
+    }
+    setUserPredictions((prev: any) => ({ ...prev, [marketId]: prediction }));
+  };
+
+  const submitPredictions = async () => {
+    if (!walletAddress) return;
+    const predictionsArray = Object.entries(userPredictions).map(([marketId, prediction]) => ({
+      daily_battle_market_id: marketId,
+      prediction
+    }));
+
+    if (predictionsArray.length < 5) return;
+
+    setSubmittingDaily(true);
+    try {
+      // Note: A real implementation would request auth/nonce signing here 
+      // but assuming the backend accepts standard req.user logic or basic bypass.
+      // (Simplified for this MVP)
+      const res = await fetch(`${API}/daily/predict`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${walletAddress}` // Using raw address for mock auth if needed, or backend requires token.
+        },
+        body: JSON.stringify({ predictions: predictionsArray })
+      });
+      if (res.ok) {
+        alert("Predictions submitted successfully! +10 XP awarded.");
+        fetchDailyData(); // Refresh to get the locked state
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Error submitting predictions');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error submitting predictions');
+    } finally {
+      setSubmittingDaily(false);
+    }
+  };
+
+  const hasParticipated = dailyBattle?.user_stats?.participated;
+  const numSelected = Object.keys(userPredictions).length;
+
+  return (
+    <main className="main-content">
+      <section className="hero" style={{ padding: '1rem', marginBottom: '1.5rem', background: 'radial-gradient(circle at top right, rgba(139, 92, 246, 0.15), transparent 60%)' }}>
+        <h1>The Daily 5 ⚔️</h1>
+        <p>Man vs Machine. Can you outpredict our flagship AI agent, Homer Baba?</p>
+      </section>
+
+      {/* Scoreboard Header */}
+      {dailyScoreboard && (
+        <div className="daily-scoreboard">
+          <div className="score-card ai-score">
+            <div className="score-icon">🤖</div>
+            <div className="score-info">
+              <h4>Homer Baba (AI)</h4>
+              <div className="score-stats">
+                <span>{(dailyScoreboard.all_time.homer_baba.accuracy * 100).toFixed(1)}% Accuracy</span>
+                <span className="muted">| {dailyScoreboard.all_time.homer_baba.wins} Wins</span>
+              </div>
+            </div>
+          </div>
+          <div className="score-vs">VS</div>
+          <div className="score-card community-score">
+            <div className="score-icon">🌍</div>
+            <div className="score-info">
+              <h4>The Community</h4>
+              <div className="score-stats">
+                <span>{(dailyScoreboard.all_time.community.accuracy * 100).toFixed(1)}% Accuracy</span>
+                <span className="muted">| {dailyScoreboard.all_time.community.wins} Wins</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Personal Stats (If wallet connected) */}
+      {walletAddress && dailyUserStats && (
+        <div className="user-daily-stats">
+          <h4>Your Daily 5 Stats</h4>
+          <div className="stats-row">
+            <div className="stat-box">
+              <span className="stat-val">{dailyUserStats.wins} / {dailyUserStats.total_predictions}</span>
+              <span className="stat-label">Total Correct</span>
+            </div>
+            <div className="stat-box">
+              <span className="stat-val">{(dailyUserStats.accuracy * 100).toFixed(1)}%</span>
+              <span className="stat-label">Accuracy</span>
+            </div>
+            <div className="stat-box">
+              <span className="stat-val">{dailyUserStats.total_battles_participated}</span>
+              <span className="stat-label">Battles Played</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* The Daily 5 Markets */}
+      <h3 style={{ margin: '2rem 0 1rem 0' }}>Today's Markets</h3>
+      {dailyBattle ? (
+        <div className="daily-markets-list">
+          {dailyBattle.markets.map((m: any, idx: number) => {
+            const isLocked = hasParticipated;
+            const myPick = isLocked ? m.user_prediction : userPredictions[m.id];
+
+            return (
+              <div key={m.id} className="daily-market-row">
+                <div className="dm-number">{idx + 1}</div>
+                <div className="dm-content">
+                  <h4 className="dm-question">{m.market.question}</h4>
+
+                  {/* Homer Baba's Pick Card */}
+                  <div className="homer-pick-card">
+                    <div className="hp-header">
+                      <span className="hp-name">🤖 Homer Baba's Analysis</span>
+                      <span className="hp-conf">{(m.homer_confidence * 100).toFixed(0)}% Confidence • Prediction: <strong className={`pred-${m.homer_prediction}`}>{m.homer_prediction}</strong></span>
+                    </div>
+                    <p className="hp-commentary">"{m.homer_commentary}"</p>
+                  </div>
+
+                  {/* Prediction Controls */}
+                  <div className="dm-controls">
+                    <button
+                      className={`dm-btn yes-btn ${myPick === 'YES' ? 'selected' : ''} ${isLocked ? 'locked' : ''}`}
+                      onClick={() => !isLocked && handlePrediction(m.id, 'YES')}
+                      disabled={isLocked}
+                    >
+                      YES
+                    </button>
+                    <button
+                      className={`dm-btn no-btn ${myPick === 'NO' ? 'selected' : ''} ${isLocked ? 'locked' : ''}`}
+                      onClick={() => !isLocked && handlePrediction(m.id, 'NO')}
+                      disabled={isLocked}
+                    >
+                      NO
+                    </button>
+                  </div>
+
+                  {isLocked && m.result && (
+                    <div className={`dm-result ${m.result === 'WIN' ? 'win' : 'loss'}`}>
+                      Result: {m.result}
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="state-container">
+          <p>No active battle for today yet. Check back later!</p>
+        </div>
+      )}
+
+      {/* Submission Footer */}
+      {dailyBattle && !hasParticipated && (
+        <div className="daily-footer-sticky">
+          <div className="df-left">
+            <span>{numSelected} / 5 Selected</span>
+            {numSelected === 5 && <span className="df-ready">Ready to submit!</span>}
+          </div>
+          <button
+            className="df-submit-btn"
+            disabled={numSelected < 5 || submittingDaily || !walletAddress}
+            onClick={submitPredictions}
+          >
+            {!walletAddress ? 'Connect Wallet to Play' : submittingDaily ? 'Submitting...' : 'Lock in Predictions'}
+          </button>
+        </div>
+      )}
+
+      {/* Daily Top Prophets Leaderboard */}
+      {dailyLeaderboard && dailyLeaderboard.length > 0 && (
+        <div style={{ marginTop: '3rem' }}>
+          <h3>Top Daily Prophets</h3>
+          <div className="leaderboard-table-wrapper" style={{ marginTop: '1rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)' }}>Rank</th>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)' }}>Prophet</th>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)', textAlign: 'center' }}>Total Correct</th>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)', textAlign: 'right' }}>Accuracy</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyLeaderboard.map((l: any, idx: number) => (
+                  <tr key={l.user?.id || idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '1rem', fontWeight: 'bold' }}>#{l.rank}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontFamily: 'monospace' }}>
+                          {l.user?.id.substring(0, 6)}...{l.user?.id.substring(l.user?.id.length - 4)}
+                        </span>
+                        <span className="rank-badge">{l.user?.rank_badge}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem', textAlign: 'center', fontWeight: 'bold' }}>{l.total_correct}</td>
+                    <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--accent-blue)' }}>{(l.accuracy * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

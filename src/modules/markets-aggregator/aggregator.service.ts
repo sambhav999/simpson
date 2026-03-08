@@ -1,5 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import axiosRetry from 'axios-retry';
+// @ts-ignore
+import MyriadClient from 'myriad-sdk';
 import { config } from '../../core/config/config';
 import { logger } from '../../core/logger/logger';
 import { AppError } from '../../core/config/error.handler';
@@ -222,10 +224,35 @@ export class AggregatorService {
 
     private async fetchMyriadMarkets(): Promise<AggregatedMarket[]> {
         try {
-            // const response = await this.myriadClient.get('/markets');
-            // return response.data;
-            return [];
-        } catch (err) { throw err; }
+            const myriadClient = new MyriadClient();
+            const response = await myriadClient.myriad.fetchMarkets({ status: 'open' as any });
+            const markets = response?.data || [];
+
+            const parsedMarkets: AggregatedMarket[] = markets.map((m: any) => {
+                return {
+                    id: `MYR-${m.id}`,
+                    title: m.title || 'Unknown Market',
+                    description: m.description || '',
+                    yesTokenMint: `MYR_YES_${m.id}`,
+                    noTokenMint: `MYR_NO_${m.id}`,
+                    expiry: m.expiresAt || null,
+                    status: m.status === 'open' ? 'active' : m.status,
+                    category: m.category?.name || m.category?.id || 'Myriad',
+                    image: m.imageUrl || undefined,
+                    volume: m.volume?.total ? `$${m.volume.total.toLocaleString()}` : undefined,
+                    liquidity: m.liquidity?.total ? `$${m.liquidity.total.toLocaleString()}` : undefined,
+                    prices: (m.outcomes && m.outcomes.length >= 2) ? [m.outcomes[0].price, m.outcomes[1].price] : undefined,
+                    source: 'myriad' as const,
+                    slug: m.slug || undefined
+                };
+            });
+
+            logger.info(`Myriad: fetched ${parsedMarkets.length} active markets from SDK`);
+            return parsedMarkets;
+        } catch (err) {
+            logger.error(`Failed to fetch from Myriad: ${err}`);
+            throw err;
+        }
     }
 
     private async fetchPolymarketMarkets(): Promise<AggregatedMarket[]> {

@@ -59,11 +59,9 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
  * Generate a JWT token for a wallet address
  */
 export function generateToken(wallet: string): string {
-    const signOptions: jwt.SignOptions = {};
-    if (config.JWT_EXPIRY && config.JWT_EXPIRY !== 'never') {
-        signOptions.expiresIn = config.JWT_EXPIRY as any;
-    }
-    return jwt.sign({ wallet }, config.JWT_SECRET, signOptions);
+    return jwt.sign({ wallet }, config.JWT_SECRET, {
+        expiresIn: config.JWT_EXPIRY as any,
+    });
 }
 
 function extractToken(req: Request): string | null {
