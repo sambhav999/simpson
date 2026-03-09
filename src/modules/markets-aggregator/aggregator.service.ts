@@ -1,6 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
 import axiosRetry from 'axios-retry';
-// @ts-ignore
 // import MyriadClient from 'myriad-sdk'; // Bypassing SDK due to issues
 import { config } from '../../core/config/config';
 import { logger } from '../../core/logger/logger';
@@ -76,7 +75,6 @@ export interface TradeQuoteResponse {
 
 export class AggregatorService {
     private readonly limitlessClient: AxiosInstance;
-    private readonly myriadClient: AxiosInstance;
     private readonly polymarketClient: AxiosInstance;
     private readonly manifoldClient: AxiosInstance;
     private readonly hedgehogClient: AxiosInstance;
@@ -116,7 +114,6 @@ export class AggregatorService {
             limitlessHeaders['X-API-Key'] = config.LIMITLESS_API_KEY;
         }
         this.limitlessClient = this.createClient(config.LIMITLESS_API_URL, limitlessHeaders);
-        this.myriadClient = this.createClient(config.MYRIAD_API_URL);
         this.polymarketClient = this.createClient(config.POLYMARKET_API_URL);
         this.manifoldClient = this.createClient(config.MANIFOLD_API_URL);
         this.hedgehogClient = this.createClient(config.HEDGEHOG_API_URL);
@@ -150,9 +147,8 @@ export class AggregatorService {
             logger.debug('Fetching markets from Aggregator APIs (Limitless, Myriad, Polymarket)');
 
             // Example of parallel fetching:
-            const [limitlessRes, myriadRes, polymarketRes, manifoldRes, hedgehogRes, kalshiRes, sxbetRes] = await Promise.allSettled([
+            const [limitlessRes, polymarketRes, manifoldRes, hedgehogRes, kalshiRes, sxbetRes] = await Promise.allSettled([
                 this.fetchLimitlessMarkets(),
-                this.fetchMyriadMarkets(),
                 this.fetchPolymarketMarkets(),
                 this.fetchManifoldMarkets(),
                 this.fetchHedgehogMarkets(),
@@ -168,11 +164,6 @@ export class AggregatorService {
                 logger.error(`Failed to fetch short from Limitless: ${limitlessRes.reason}`);
             }
 
-            if (myriadRes.status === 'fulfilled') {
-                allMarkets.push(...myriadRes.value.map(m => ({ ...m, source: 'myriad' as const })));
-            } else {
-                logger.error(`Failed to fetch from Myriad: ${myriadRes.reason}`);
-            }
 
             if (polymarketRes.status === 'fulfilled') {
                 allMarkets.push(...polymarketRes.value.map(m => ({ ...m, source: 'polymarket' as const })));
@@ -284,48 +275,6 @@ export class AggregatorService {
         return parsedMarkets;
     }
 
-    private async fetchMyriadMarkets(): Promise<AggregatedMarket[]> {
-        try {
-            // Using direct Axios client instead of SDK to bypass authentication issues
-            // and target the configured MYRIAD_API_URL.
-            const response = await this.myriadClient.get('/markets', {
-                params: { status: 'open' }
-            });
-
-            const markets = response.data?.data || response.data || [];
-
-            if (!Array.isArray(markets) || markets.length === 0) {
-                logger.info('Myriad: API returned 0 markets');
-                return [];
-            }
-
-            const parsedMarkets: AggregatedMarket[] = markets.map((m: any) => {
-                return {
-                    id: `MYR-${m.id}`,
-                    title: m.title || 'Unknown Market',
-                    description: m.description || '',
-                    yesTokenMint: m.yesTokenMint || `MYR_YES_${m.id}`,
-                    noTokenMint: m.noTokenMint || `MYR_NO_${m.id}`,
-                    expiry: m.expiresAt || m.expirationDate || null,
-                    status: m.status === 'open' ? 'active' : m.status,
-                    category: m.category?.name || m.category || 'Myriad',
-                    image: m.imageUrl || m.image || this.getRandomFallback(m.category?.name || m.category || 'Myriad'),
-                    volume: m.volume?.total || m.volumeFormatted || undefined,
-                    liquidity: m.liquidity?.total || m.liquidityFormatted || undefined,
-                    prices: m.prices || undefined,
-                    source: 'myriad' as const,
-                    slug: m.slug || undefined
-                };
-            });
-
-            logger.info(`Myriad: fetched ${parsedMarkets.length} active markets from API`);
-            return parsedMarkets;
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            logger.warn(`Failed to fetch from Myriad: ${message}`);
-            return []; // Fail gracefully for aggregator
-        }
-    }
 
     private async fetchHedgehogMarkets(): Promise<AggregatedMarket[]> {
         try {

@@ -66,7 +66,6 @@ const SOURCES = [
   { key: 'all', label: 'All Sources', icon: '🌐' },
   { key: 'limitless', label: 'Limitless', icon: '♾️' },
   { key: 'polymarket', label: 'Polymarket', icon: '📈' },
-  { key: 'myriad', label: 'Myriad', icon: '🔮' },
   { key: 'manifold', label: 'Manifold', icon: '🎯' },
   { key: 'hedgehog', label: 'Hedgehog', icon: '🦔' },
   { key: 'kalshi', label: 'Kalshi', icon: '🏛️' },

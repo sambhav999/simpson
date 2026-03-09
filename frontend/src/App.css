@@ -475,12 +475,6 @@
   border: 1px solid rgba(59, 130, 246, 0.25);
 }
 
-.source-badge.myriad {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--accent-yellow);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-}
-
 .source-badge.manifold {
   background: rgba(45, 212, 191, 0.12);
   color: #2dd4bf;

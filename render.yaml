@@ -29,8 +29,6 @@ services:
         sync: false
       - key: LIMITLESS_API_URL
         value: https://api.limitless.exchange
-      - key: MYRIAD_API_URL
-        value: https://api.myriad.markets
       - key: POLYMARKET_API_URL
         value: https://gamma-api.polymarket.com
 

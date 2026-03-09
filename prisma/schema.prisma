@@ -45,7 +45,7 @@ model User {
 model Market {
   id              String   @id @default(cuid())
   externalId      String?  @unique @map("external_id")
-  source          String   @default("polymarket") // polymarket, limitless, myriad
+  source          String   @default("polymarket") // polymarket, limitless, myriad (REMOVED) -> polymarket, limitless
   title           String
   description     String   @default("")
   category        String   @default("general")
