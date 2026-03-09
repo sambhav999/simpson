@@ -80,7 +80,21 @@ export const fetchAccuracyLeaderboard = (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return request<any>(`/leaderboard/accuracy${qs}`);
 };
+export const fetchVolumeLeaderboard = (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<any>(`/leaderboard/volume${qs}`);
+};
 export const fetchCreatorsLeaderboard = () => request<any>('/leaderboard/creators');
+
+// Trades
+export const recordTrade = (data: {
+    walletAddress: string;
+    marketId: string;
+    tokenMint?: string;
+    side: string;
+    amount: number;
+    price?: number;
+}) => request<any>('/trade', { method: 'POST', body: JSON.stringify(data) });
 
 // Daily 5
 export const fetchDaily = () => request<any>('/api/daily');

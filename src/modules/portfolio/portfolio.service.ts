@@ -94,13 +94,16 @@ export class PortfolioService {
         skip,
         take: limit,
         orderBy: { timestamp: 'desc' },
-        include: { market: { select: { title: true, yesTokenMint: true, noTokenMint: true } } },
+        include: { market: { select: { title: true, yesTokenMint: true, noTokenMint: true, image: true, category: true } } },
       }),
       this.prisma.trade.count({ where }),
     ]);
     return {
       data: trades.map((t) => ({
         ...t,
+        marketTitle: t.market.title,
+        marketImage: (t.market as any).image,
+        marketCategory: (t.market as any).category,
         tokenSide: t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO',
       })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },

@@ -20,7 +20,8 @@ export default function TradeModal({
     setTradeSuccess,
     paymentMethod,
     setPaymentMethod,
-    qrUri
+    qrUri,
+    onTradeSuccess
 }: any) {
     if (!isOpen || !market) return null;
 
@@ -58,7 +59,10 @@ export default function TradeModal({
                                 <h3>Trade Successful!</h3>
                                 <p>You bought <strong>${Number(amount).toFixed(2)}</strong> of <strong>{side}</strong></p>
                                 <p className="success-market-title">{market.title || market.question}</p>
-                                <button className="quote-btn" onClick={onClose}>Done</button>
+                                <button className="quote-btn" onClick={() => {
+                                    if (onTradeSuccess) onTradeSuccess();
+                                    onClose();
+                                }}>Done</button>
                             </div>
                         ) : quote ? (
                             <div className="quote-confirmation">

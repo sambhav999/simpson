@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import './App.css';
+import { recordTrade } from './lib/api';
 
 // Components
 import ErrorBoundary from './components/ErrorBoundary';
@@ -83,6 +84,7 @@ function App() {
   const [sortBy, setSortBy] = useState('trending');
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle'>('markets');
+  const [portfolioRefreshTrigger, setPortfolioRefreshTrigger] = useState(0);
 
   // Daily State
   const [dailyBattle, setDailyBattle] = useState<any>(null);
@@ -317,13 +319,25 @@ function App() {
   };
 
   const checkBalanceAndConfirm = async () => {
-    if (!publicKey) return;
+    if (!publicKey || !selectedMarket || !walletAddress) return;
     setConfirming(true);
+    setQuoteError(null);
     try {
-      // Basic simulation for now, actual implementation should call contract
-      setTradeSuccess(true);
+      const res = await recordTrade({
+        walletAddress,
+        marketId: selectedMarket.id,
+        side,
+        amount: Number(amount),
+        price: quote?.price || 0.5,
+      });
+
+      if (res.success) {
+        setTradeSuccess(true);
+      } else {
+        setQuoteError('Failed to record trade on server');
+      }
     } catch (err) {
-      setQuoteError('Trade failed');
+      setQuoteError(err instanceof Error ? err.message : 'Trade failed');
     } finally {
       setConfirming(false);
     }
@@ -518,7 +532,7 @@ function App() {
           )}
 
           {currentView === 'portfolio' && (
-            <PortfolioView walletAddress={walletAddress} onConnectWallet={() => setShowWalletSelector(true)} />
+            <PortfolioView walletAddress={walletAddress} onConnectWallet={() => setShowWalletSelector(true)} refreshTrigger={portfolioRefreshTrigger} />
           )}
 
           {currentView === 'leaderboard' && (
@@ -594,6 +608,7 @@ function App() {
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           qrUri={qrUri}
+          onTradeSuccess={() => setPortfolioRefreshTrigger(prev => prev + 1)}
         />
       </Suspense>
     </div>

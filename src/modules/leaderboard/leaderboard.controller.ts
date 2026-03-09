@@ -111,13 +111,26 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
 // GET /leaderboard/accuracy — Top predictors by win rate
 leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { min_predictions = '10', limit = '100' } = req.query;
+    const { min_predictions = '5', limit = '100', timeframe = 'all_time' } = req.query;
     const minPreds = Number(min_predictions);
+
+    let dateFilter = {};
+    const now = new Date();
+    if (timeframe === 'daily') {
+      const start = new Date(now); start.setHours(0, 0, 0, 0);
+      dateFilter = { updatedAt: { gte: start } };
+    } else if (timeframe === 'weekly') {
+      const start = new Date(now); start.setDate(now.getDate() - 7);
+      dateFilter = { updatedAt: { gte: start } };
+    } else if (timeframe === 'monthly') {
+      const start = new Date(now); start.setMonth(now.getMonth() - 1);
+      dateFilter = { updatedAt: { gte: start } };
+    }
 
     // Get users with enough completed predictions
     const results = await prisma.position.groupBy({
       by: ['walletAddress'],
-      where: { status: { in: ['WON', 'LOST'] } },
+      where: { status: { in: ['WON', 'LOST'] }, ...dateFilter },
       _count: { _all: true },
     });
 
@@ -127,7 +140,7 @@ leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: Nex
     // Get win counts
     const winCounts = await prisma.position.groupBy({
       by: ['walletAddress'],
-      where: { walletAddress: { in: wallets }, status: 'WON' },
+      where: { walletAddress: { in: wallets }, status: 'WON', ...dateFilter },
       _count: { _all: true },
     });
     const winMap = new Map(winCounts.map(w => [w.walletAddress, w._count._all]));
@@ -161,67 +174,6 @@ leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: Nex
           wins: l.wins,
           losses: l.total - l.wins,
           current_streak: user?.currentStreak || 0,
-        };
-      }),
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// GET /leaderboard/creators — Top creators by activity
-leaderboardRouter.get('/creators', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { limit = '100' } = req.query;
-
-    const creators = await prisma.creatorMarket.groupBy({
-      by: ['creatorId'],
-      _count: { _all: true },
-    });
-
-    const creatorIds = creators.map(c => c.creatorId);
-
-    const [users, attrCounts, followerCounts] = await Promise.all([
-      prisma.user.findMany({
-        where: { walletAddress: { in: creatorIds } },
-        select: { walletAddress: true, username: true, avatarUrl: true, xpTotal: true },
-      }),
-      prisma.attribution.groupBy({
-        by: ['creatorId'],
-        where: { creatorId: { in: creatorIds } },
-        _count: { _all: true },
-      }),
-      prisma.follow.groupBy({
-        by: ['followingId'],
-        where: { followingId: { in: creatorIds } },
-        _count: { _all: true },
-      }),
-    ]);
-
-    const userMap = new Map(users.map(u => [u.walletAddress, u]));
-    const attrMap = new Map(attrCounts.map(a => [a.creatorId, a._count._all]));
-    const followerMap = new Map(followerCounts.map(f => [f.followingId, f._count._all]));
-    const marketCountMap = new Map(creators.map(c => [c.creatorId, c._count._all]));
-
-    const leaderboard = creatorIds
-      .map(id => ({
-        id,
-        marketsHosted: marketCountMap.get(id) || 0,
-        conversions: attrMap.get(id) || 0,
-        followers: followerMap.get(id) || 0,
-      }))
-      .sort((a, b) => b.conversions - a.conversions || b.marketsHosted - a.marketsHosted)
-      .slice(0, Number(limit));
-
-    res.json({
-      leaderboard: leaderboard.map((l, idx) => {
-        const user = userMap.get(l.id);
-        return {
-          rank: idx + 1,
-          creator: { id: l.id, username: user?.username, avatar_url: user?.avatarUrl },
-          markets_hosted: l.marketsHosted,
-          conversions: l.conversions,
-          followers: l.followers,
         };
       }),
     });

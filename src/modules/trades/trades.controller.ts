@@ -30,6 +30,37 @@ tradesRouter.post('/quote', async (req: Request, res: Response, next: NextFuncti
 });
 
 /**
+ * Record a manual/simulated trade
+ */
+tradesRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { walletAddress, marketId, tokenMint, side, amount, price } = req.body;
+
+    if (!walletAddress || !marketId || !side || !amount) {
+      return next(new AppError('Missing required trade fields', 400));
+    }
+
+    // Generate a unique simulation signature if not provided
+    const signature = `sim_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
+
+    const trade = await tradesService.recordTrade({
+      walletAddress,
+      marketId,
+      tokenMint: tokenMint || 'placeholder_mint',
+      side: side === 'YES' ? 'BUY' : 'BUY', // Assuming opening a position is always a BUY of a specific token
+      price: price || 0.5,
+      amount: Number(amount),
+      signature,
+      timestamp: new Date()
+    });
+
+    res.json({ success: true, data: trade });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * Solana Pay Transaction Request - GET
  * Returns the metadata for the transaction request so the wallet can display the app details
  */
