@@ -9,6 +9,7 @@ const envSchema = z.object({
   LIMITLESS_API_KEY: z.string().optional(),
   MYRIAD_API_URL: z.string().url(),
   POLYMARKET_API_URL: z.string().url(),
+  MANIFOLD_API_URL: z.string().url().default('https://api.manifold.markets/v0'),
   HEDGEHOG_API_URL: z.string().url().default('https://api.hedgehog.markets/v1'),
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

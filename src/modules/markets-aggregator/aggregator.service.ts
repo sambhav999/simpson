@@ -116,7 +116,7 @@ export class AggregatorService {
         this.limitlessClient = this.createClient(config.LIMITLESS_API_URL, limitlessHeaders);
         this.myriadClient = this.createClient(config.MYRIAD_API_URL);
         this.polymarketClient = this.createClient(config.POLYMARKET_API_URL);
-        this.manifoldClient = this.createClient('https://api.manifold.markets/v0');
+        this.manifoldClient = this.createClient(config.MANIFOLD_API_URL);
         this.hedgehogClient = this.createClient(config.HEDGEHOG_API_URL);
     }
 
