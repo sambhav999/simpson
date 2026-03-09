@@ -50,7 +50,7 @@ export interface AggregatedMarket {
     expiry: string | null;
     status: string;
     category: string;
-    source?: 'limitless' | 'myriad' | 'polymarket' | 'manifold' | 'hedgehog';
+    source?: 'limitless' | 'myriad' | 'polymarket' | 'manifold' | 'kalshi' | 'hedgehog';
     image?: string;
     volume?: string;
     liquidity?: string;
@@ -80,6 +80,7 @@ export class AggregatorService {
     private readonly polymarketClient: AxiosInstance;
     private readonly manifoldClient: AxiosInstance;
     private readonly hedgehogClient: AxiosInstance;
+    private readonly kalshiClient: AxiosInstance;
     private readonly categoryImages: Record<string, string[]> = {
         'Crypto': [
             'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&q=80',
@@ -118,6 +119,7 @@ export class AggregatorService {
         this.polymarketClient = this.createClient(config.POLYMARKET_API_URL);
         this.manifoldClient = this.createClient(config.MANIFOLD_API_URL);
         this.hedgehogClient = this.createClient(config.HEDGEHOG_API_URL);
+        this.kalshiClient = this.createClient(config.KALSHI_API_URL);
     }
 
     private createClient(baseURL: string, extraHeaders: Record<string, string> = {}): AxiosInstance {
@@ -146,12 +148,13 @@ export class AggregatorService {
             logger.debug('Fetching markets from Aggregator APIs (Limitless, Myriad, Polymarket)');
 
             // Example of parallel fetching:
-            const [limitlessRes, myriadRes, polymarketRes, manifoldRes, hedgehogRes] = await Promise.allSettled([
+            const [limitlessRes, myriadRes, polymarketRes, manifoldRes, hedgehogRes, kalshiRes] = await Promise.allSettled([
                 this.fetchLimitlessMarkets(),
                 this.fetchMyriadMarkets(),
                 this.fetchPolymarketMarkets(),
                 this.fetchManifoldMarkets(),
-                this.fetchHedgehogMarkets()
+                this.fetchHedgehogMarkets(),
+                this.fetchKalshiMarkets()
             ]);
 
             const allMarkets: AggregatedMarket[] = [];
@@ -184,6 +187,12 @@ export class AggregatorService {
                 allMarkets.push(...hedgehogRes.value.map(m => ({ ...m, source: 'hedgehog' as const })));
             } else {
                 logger.error(`Failed to fetch from Hedgehog: ${hedgehogRes.reason}`);
+            }
+
+            if (kalshiRes.status === 'fulfilled') {
+                allMarkets.push(...kalshiRes.value.map(m => ({ ...m, source: 'kalshi' as const })));
+            } else {
+                logger.error(`Failed to fetch from Kalshi: ${kalshiRes.reason}`);
             }
 
             logger.info(`Fetched ${allMarkets.length} consolidated markets from aggregator sources`);
@@ -477,6 +486,50 @@ export class AggregatorService {
         } catch (err) {
             logger.warn(`Failed fetching Polymarket data. (Note: Gamma API may block certain IPs): ${err}`);
             throw err;
+        }
+    }
+
+    private async fetchKalshiMarkets(): Promise<AggregatedMarket[]> {
+        try {
+            const response = await this.kalshiClient.get('/markets', {
+                params: {
+                    limit: 100,
+                    status: 'open',
+                }
+            });
+
+            const markets = response.data?.markets;
+            if (!Array.isArray(markets)) return [];
+
+            return markets.map((m: any): AggregatedMarket => {
+                // Kalshi "yes_sub_title" and "no_sub_title" are sometimes provided, or standard names
+                const yesTokenMint = `KAL_YES_${m.ticker}`;
+                const noTokenMint = `KAL_NO_${m.ticker}`;
+
+                return {
+                    id: `KAL-${m.ticker}`,
+                    title: m.title || m.ticker || 'Unknown Kalshi Market',
+                    description: m.subtitle || '',
+                    yesTokenMint,
+                    noTokenMint,
+                    expiry: m.close_time ? new Date(m.close_time).toISOString() : null,
+                    status: 'active',
+                    category: m.category || 'Kalshi',
+                    image: m.image_url || this.getRandomFallback(m.category || 'Kalshi'),
+                    volume: m.volume ? String(m.volume) : undefined,
+                    liquidity: m.liquidity ? String(m.liquidity) : undefined,
+                    prices: [
+                        (m.yes_bid !== undefined && m.yes_bid !== null) ? (m.yes_bid / 100) : 0.5,
+                        (m.no_bid !== undefined && m.no_bid !== null) ? (m.no_bid / 100) : 0.5
+                    ],
+                    source: 'kalshi',
+                    slug: m.mutually_exclusive_group_id || undefined
+                };
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            logger.warn(`Failed to fetch from Kalshi: ${message}`);
+            return [];
         }
     }
 
