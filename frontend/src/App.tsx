@@ -54,7 +54,13 @@ interface AIPrediction {
 
 
 
-const CATEGORIES = ['All', 'Crypto', 'Sports', 'Politics', 'General'];
+const CATEGORIES = [
+  { value: 'All', label: 'All Categories' },
+  { value: 'Crypto', label: 'Crypto' },
+  { value: 'Sports', label: 'Sports' },
+  { value: 'Politics', label: 'Politics' },
+  { value: 'General', label: 'General' },
+];
 const SOURCES = [
   { key: 'all', label: 'All Sources', icon: '🌐' },
   { key: 'limitless', label: 'Limitless', icon: '♾️' },
@@ -395,9 +401,26 @@ function App() {
                 </div>
                 <div className="filters-row">
                   <div className="category-scroll">
-                    {CATEGORIES.map(cat => (
-                      <button key={cat} className={`cat-btn ${category === cat ? 'active' : ''}`} onClick={() => setCategory(cat)}>{cat}</button>
-                    ))}
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="category-dropdown glass-effect"
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        padding: '0.4rem 1rem',
+                        borderRadius: '20px',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {CATEGORIES.map(cat => (
+                        <option key={cat.value} value={cat.value} style={{ color: 'black' }}>
+                          {cat.label}
+                        </option>
+                      ))}
+                    </select>
 
                     <select
                       value={sortBy}
