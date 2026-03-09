@@ -488,6 +488,13 @@
   border: 1px solid rgba(45, 212, 191, 0.25);
 }
 
+.source-badge.hedgehog {
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+  /* Rose/Red */
+  border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
 .card-footer-right {
   display: flex;
   align-items: center;
@@ -1661,6 +1668,7 @@
   box-shadow: none;
   cursor: not-allowed;
 }
+
 /* ===== AI & SOCIAL UTILITIES ===== */
 .oracle-border {
   position: relative;
@@ -1684,8 +1692,15 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 10px var(--oracle-glow); }
-  50% { box-shadow: 0 0 25px var(--oracle-glow); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 10px var(--oracle-glow);
+  }
+
+  50% {
+    box-shadow: 0 0 25px var(--oracle-glow);
+  }
 }
 
 .prophet-badge {
@@ -1701,8 +1716,17 @@
   font-weight: 700;
 }
 
-.rank-legendary { background: linear-gradient(90deg, #f59e0b, #ec4899) !important; color: white !important; border: none !important; }
-.rank-grand { background: rgba(139, 92, 246, 0.2) !important; color: #c084fc !important; border-color: rgba(139, 92, 246, 0.4) !important; }
+.rank-legendary {
+  background: linear-gradient(90deg, #f59e0b, #ec4899) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.rank-grand {
+  background: rgba(139, 92, 246, 0.2) !important;
+  color: #c084fc !important;
+  border-color: rgba(139, 92, 246, 0.4) !important;
+}
 
 .battle-arena {
   background: var(--arena-bg);
@@ -1729,8 +1753,15 @@
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-15px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-15px);
+  }
 }
 
 .vs-badge {
@@ -1746,7 +1777,7 @@
   justify-content: center;
   border-radius: 50%;
   border: 1px solid var(--border);
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
 .daily-card {
@@ -1878,7 +1909,10 @@
   font-size: 0.85rem;
 }
 
-.sol-icon { color: var(--accent-cyan); font-weight: bold; }
+.sol-icon {
+  color: var(--accent-cyan);
+  font-weight: bold;
+}
 
 .user-profile-btn {
   display: flex;
@@ -1909,7 +1943,9 @@
   transition: color 0.2s ease;
 }
 
-.disconnect-icon-btn:hover { color: var(--accent-red); }
+.disconnect-icon-btn:hover {
+  color: var(--accent-red);
+}
 
 /* Featured / Oracle Grid */
 .featured-section {
@@ -1953,7 +1989,9 @@
   transition: opacity 0.2s ease;
 }
 
-.view-all-btn:hover { opacity: 0.8; }
+.view-all-btn:hover {
+  opacity: 0.8;
+}
 
 .featured-grid {
   display: grid;
@@ -1995,8 +2033,15 @@
   font-size: 1.1rem;
 }
 
-.card-prediction .YES { color: var(--accent-green); text-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
-.card-prediction .NO { color: var(--accent-red); text-shadow: 0 0 10px rgba(239, 68, 68, 0.3); }
+.card-prediction .YES {
+  color: var(--accent-green);
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.card-prediction .NO {
+  color: var(--accent-red);
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
 
 .card-commentary {
   font-style: italic;
@@ -2031,9 +2076,12 @@
   scrollbar-width: none;
 }
 
-.category-scroll::-webkit-scrollbar { display: none; }
+.category-scroll::-webkit-scrollbar {
+  display: none;
+}
 
-.cat-btn, .src-btn {
+.cat-btn,
+.src-btn {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
   color: var(--text-secondary);
@@ -2046,12 +2094,14 @@
   white-space: nowrap;
 }
 
-.cat-btn:hover, .src-btn:hover {
+.cat-btn:hover,
+.src-btn:hover {
   border-color: var(--border-hover);
   background: rgba(255, 255, 255, 0.06);
 }
 
-.cat-btn.active, .src-btn.active {
+.cat-btn.active,
+.src-btn.active {
   background: var(--accent-blue);
   color: white;
   border-color: transparent;
@@ -2108,7 +2158,7 @@
   text-transform: uppercase;
   letter-spacing: 1px;
   z-index: 10;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .market-card-content {
@@ -2174,7 +2224,8 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.oracle-market-img, .arena-market-img {
+.oracle-market-img,
+.arena-market-img {
   width: 60px;
   height: 60px;
   border-radius: var(--radius-sm);

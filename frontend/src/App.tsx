@@ -61,6 +61,7 @@ const SOURCES = [
   { key: 'polymarket', label: 'Polymarket', icon: '📈' },
   { key: 'myriad', label: 'Myriad', icon: '🔮' },
   { key: 'manifold', label: 'Manifold', icon: '🎯' },
+  { key: 'hedgehog', label: 'Hedgehog', icon: '🦔' },
 ];
 
 function App() {
