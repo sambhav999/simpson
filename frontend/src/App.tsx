@@ -63,6 +63,7 @@ const SOURCES = [
   { key: 'manifold', label: 'Manifold', icon: '🎯' },
   { key: 'hedgehog', label: 'Hedgehog', icon: '🦔' },
   { key: 'kalshi', label: 'Kalshi', icon: '🏛️' },
+  { key: 'sxbet', label: 'SX Bet', icon: '⚽' },
 ];
 
 function App() {

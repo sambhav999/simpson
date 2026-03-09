@@ -50,7 +50,7 @@ export interface AggregatedMarket {
     expiry: string | null;
     status: string;
     category: string;
-    source?: 'limitless' | 'myriad' | 'polymarket' | 'manifold' | 'kalshi' | 'hedgehog';
+    source?: 'limitless' | 'myriad' | 'polymarket' | 'manifold' | 'kalshi' | 'hedgehog' | 'sxbet';
     image?: string;
     volume?: string;
     liquidity?: string;
@@ -81,6 +81,7 @@ export class AggregatorService {
     private readonly manifoldClient: AxiosInstance;
     private readonly hedgehogClient: AxiosInstance;
     private readonly kalshiClient: AxiosInstance;
+    private readonly sxbetClient: AxiosInstance;
     private readonly categoryImages: Record<string, string[]> = {
         'Crypto': [
             'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&q=80',
@@ -120,6 +121,7 @@ export class AggregatorService {
         this.manifoldClient = this.createClient(config.MANIFOLD_API_URL);
         this.hedgehogClient = this.createClient(config.HEDGEHOG_API_URL);
         this.kalshiClient = this.createClient(config.KALSHI_API_URL);
+        this.sxbetClient = this.createClient(config.SXBET_API_URL);
     }
 
     private createClient(baseURL: string, extraHeaders: Record<string, string> = {}): AxiosInstance {
@@ -148,13 +150,14 @@ export class AggregatorService {
             logger.debug('Fetching markets from Aggregator APIs (Limitless, Myriad, Polymarket)');
 
             // Example of parallel fetching:
-            const [limitlessRes, myriadRes, polymarketRes, manifoldRes, hedgehogRes, kalshiRes] = await Promise.allSettled([
+            const [limitlessRes, myriadRes, polymarketRes, manifoldRes, hedgehogRes, kalshiRes, sxbetRes] = await Promise.allSettled([
                 this.fetchLimitlessMarkets(),
                 this.fetchMyriadMarkets(),
                 this.fetchPolymarketMarkets(),
                 this.fetchManifoldMarkets(),
                 this.fetchHedgehogMarkets(),
-                this.fetchKalshiMarkets()
+                this.fetchKalshiMarkets(),
+                this.fetchSXBetMarkets()
             ]);
 
             const allMarkets: AggregatedMarket[] = [];
@@ -193,6 +196,12 @@ export class AggregatorService {
                 allMarkets.push(...kalshiRes.value.map(m => ({ ...m, source: 'kalshi' as const })));
             } else {
                 logger.error(`Failed to fetch from Kalshi: ${kalshiRes.reason}`);
+            }
+
+            if (sxbetRes.status === 'fulfilled') {
+                allMarkets.push(...sxbetRes.value.map(m => ({ ...m, source: 'sxbet' as const })));
+            } else {
+                logger.error(`Failed to fetch from SXBet: ${sxbetRes.reason}`);
             }
 
             logger.info(`Fetched ${allMarkets.length} consolidated markets from aggregator sources`);
@@ -529,6 +538,50 @@ export class AggregatorService {
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
             logger.warn(`Failed to fetch from Kalshi: ${message}`);
+            return [];
+        }
+    }
+
+    private async fetchSXBetMarkets(): Promise<AggregatedMarket[]> {
+        try {
+            const response = await this.sxbetClient.get('');
+            const markets = response.data?.data?.markets || response.data?.markets || response.data?.data || response.data;
+
+            if (!Array.isArray(markets)) return [];
+
+            return markets.slice(0, 100).map((m: any): AggregatedMarket => {
+                const yesTokenMint = `SXB_YES_${m.marketHash}`;
+                const noTokenMint = `SXB_NO_${m.marketHash}`;
+
+                // Extract a title from team names or group
+                let title = m.group1 || m.leagueLabel || 'Unknown SX Bet Market';
+                if (m.teamOneName && m.teamTwoName) {
+                    title = `${m.teamOneName} vs ${m.teamTwoName}`;
+                }
+
+                // Map SX Bet sportLabel to our categories
+                let category = 'Sports';
+                if (m.sportLabel === 'Crypto' || m.sportLabel === 'Degen Crypto') category = 'Crypto';
+                if (m.sportLabel === 'Politics') category = 'Politics';
+                if (m.sportLabel === 'Entertainment') category = 'Entertainment';
+
+                return {
+                    id: `SXB-${m.marketHash}`,
+                    title: title,
+                    description: `${m.outcomeOneName} or ${m.outcomeTwoName}`,
+                    yesTokenMint,
+                    noTokenMint,
+                    expiry: m.gameTime ? new Date(m.gameTime * 1000).toISOString() : null,
+                    status: m.status === 'ACTIVE' ? 'active' : 'inactive',
+                    category: category,
+                    image: this.getRandomFallback(category),
+                    source: 'sxbet',
+                    slug: m.sportLabel || undefined
+                };
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            logger.warn(`Failed to fetch from SXBet: ${message}`);
             return [];
         }
     }

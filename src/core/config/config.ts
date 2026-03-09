@@ -12,6 +12,7 @@ const envSchema = z.object({
   MANIFOLD_API_URL: z.string().url().default('https://api.manifold.markets/v0'),
   HEDGEHOG_API_URL: z.string().url().default('https://api.hedgehog.markets/v1'),
   KALSHI_API_URL: z.string().url().default('https://api.elections.kalshi.com/trade-api/v2'),
+  SXBET_API_URL: z.string().url().default('https://api.sx.bet/markets/active'),
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.string().default('info'),
