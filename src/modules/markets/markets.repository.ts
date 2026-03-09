@@ -52,20 +52,19 @@ export class MarketsRepository {
     let created = 0;
     const changedIds: string[] = [];
 
-    // Pre-fetch existing markets in one query to avoid N findUnique calls
-    const externalIds = markets.map(m => m.id);
-    const existingMarkets = await this.prisma.market.findMany({
-      where: { externalId: { in: externalIds } },
-      select: { id: true, externalId: true, status: true, category: true, title: true, image: true }
-    });
-
-    const existingMap = new Map(existingMarkets.map(m => [m.externalId, m]));
-
-    // Batch upserts to avoid overwhelming the DB
-    // Using sequential iteration to prevent connection pool exhaustion during background syncs
+    // Batch reads and upserts to avoid overwhelming the DB and keep memory footprint low
     const BATCH_SIZE = 50;
     for (let i = 0; i < markets.length; i += BATCH_SIZE) {
       const chunk = markets.slice(i, i + BATCH_SIZE);
+      const chunkIds = chunk.map(m => m.id);
+
+      // Pre-fetch only this chunk's existing markets
+      const existingMarkets = await this.prisma.market.findMany({
+        where: { externalId: { in: chunkIds } },
+        select: { id: true, externalId: true, status: true, category: true, title: true, image: true }
+      });
+      const existingMap = new Map(existingMarkets.map(m => [m.externalId, m]));
+
       for (const market of chunk) {
         const existing = existingMap.get(market.id);
 
@@ -87,6 +86,10 @@ export class MarketsRepository {
           changedIds.push(dbMarket.id);
         }
       }
+
+      // Small artificial delay to ensure the event loop is yielded
+      // so the HTTP server can fulfill health checks without CPU starvation
+      await new Promise(resolve => setTimeout(resolve, 5));
     }
 
     logger.info(`Market sync: ${created} created, ${updated} updated`);
