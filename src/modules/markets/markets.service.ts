@@ -14,15 +14,32 @@ export class MarketsService {
     this.aggregator = new AggregatorService();
   }
   async getMarkets(filter: MarketFilter = {}, pagination: PaginationParams = {}) {
-    const cacheKey = `${MARKETS_CACHE_KEY}:${JSON.stringify({ filter, pagination })}`;
+    const version = await this.getCacheVersion();
+    const cacheKey = `${MARKETS_CACHE_KEY}:${version}:${JSON.stringify({ filter, pagination })}`;
+
     const cached = await this.redis.get(cacheKey);
     if (cached) {
-      logger.debug('Returning markets from cache');
+      logger.debug(`Returning markets from cache (key: ${cacheKey})`);
       return JSON.parse(cached);
     }
+
+    const start = Date.now();
     const result = await this.repository.findAll(filter, pagination);
+    const duration = Date.now() - start;
+
+    logger.debug(`Markets DB query took ${duration}ms`);
     await this.redis.setex(cacheKey, CACHE_TTL, JSON.stringify(result));
     return result;
+  }
+
+  private async getCacheVersion(): Promise<string> {
+    const key = `${MARKETS_CACHE_KEY}:v`;
+    let version = await this.redis.get(key);
+    if (!version) {
+      version = '1';
+      await this.redis.set(key, version);
+    }
+    return version;
   }
   async getMarketById(id: string) {
     const cacheKey = `market:${id}`;
@@ -71,18 +88,20 @@ export class MarketsService {
   }
 
   private async invalidateTargetedCache(changedIds: string[]): Promise<void> {
-    const keysToDelete = [`${MARKETS_CACHE_KEY}:*`]; // Always clear global list cache
+    // Increment the global version key to invalidate all list caches instantly and safely
+    const versionKey = `${MARKETS_CACHE_KEY}:v`;
+    await this.redis.incr(versionKey);
+
+    const keysToDelete: string[] = [];
     for (const id of changedIds) {
-      keysToDelete.push(`market:${id}`); // specific market cache
+      keysToDelete.push(`market:${id}`);
     }
 
-    // Redis del doesn't support glob patterns directly, we have to keys() first for the global one
-    const globalKeys = await this.redis.keys(`${MARKETS_CACHE_KEY}*`);
-    const allKeysToDrop = [...new Set([...globalKeys, ...changedIds.map(id => `market:${id}`)])];
-
-    if (allKeysToDrop.length > 0) {
-      await this.redis.del(...allKeysToDrop);
-      logger.debug(`Invalidated ${allKeysToDrop.length} targeted market cache entries`);
+    if (keysToDelete.length > 0) {
+      await this.redis.del(...keysToDelete);
+      logger.debug(`Invalidated ${keysToDelete.length} specific market cache entries and incremented global version`);
+    } else {
+      logger.debug('Incremented global markets cache version');
     }
   }
 }

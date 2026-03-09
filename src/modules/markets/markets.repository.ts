@@ -131,6 +131,7 @@ export class MarketsRepository {
       }
     }
 
+    const start = Date.now();
     const [markets, total] = await Promise.all([
       this.prisma.market.findMany({
         where,
@@ -140,6 +141,11 @@ export class MarketsRepository {
       }),
       this.prisma.market.count({ where }),
     ]);
+    const duration = Date.now() - start;
+    if (duration > 500) {
+      logger.warn(`Market repository findAll took ${duration}ms (where: ${JSON.stringify(where)})`);
+    }
+
     return {
       data: markets,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
