@@ -6,6 +6,7 @@ export interface MarketFilter {
   category?: string;
   search?: string;
   source?: string;
+  sort?: string;
 }
 export interface PaginationParams {
   page?: number;
@@ -81,12 +82,33 @@ export class MarketsRepository {
         { description: { contains: search, mode: 'insensitive' } },
       ];
     }
+    let orderBy: any = { createdAt: 'desc' };
+
+    if (filter.sort) {
+      switch (filter.sort) {
+        case 'volume':
+          orderBy = { volume: 'desc' };
+          break;
+        case 'liquidity':
+          orderBy = { liquidity: 'desc' };
+          break;
+        case 'closing_soon':
+          orderBy = { expiry: 'asc' };
+          if (!where['status']) where['status'] = 'active';
+          where['expiry'] = { gt: new Date() }; // Only show future closures
+          break;
+        case 'trending':
+          orderBy = [{ volume: 'desc' }, { liquidity: 'desc' }];
+          break;
+      }
+    }
+
     const [markets, total] = await Promise.all([
       this.prisma.market.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
       this.prisma.market.count({ where }),
     ]);

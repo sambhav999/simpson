@@ -18,6 +18,7 @@ marketsRouter.get('/', async (req: Request, res: Response, next: NextFunction) =
         category: category as string | undefined,
         search: search as string | undefined,
         source: source as string | undefined,
+        sort: sort as string | undefined,
       },
       {
         page: page ? Number(page) : undefined,

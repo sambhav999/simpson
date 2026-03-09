@@ -74,6 +74,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [source, setSource] = useState('all');
+  const [sortBy, setSortBy] = useState('');
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle'>('markets');
 
@@ -113,7 +114,7 @@ function App() {
 
   // Poll for market updates every 30 seconds
   useInterval(() => {
-    if (currentView === 'markets') fetchMarkets(pagination.page, search, category, source);
+    if (currentView === 'markets') fetchMarkets(pagination.page, search, category, source, sortBy);
     if (currentView === 'daily') fetchDailyData();
     if (currentView === 'oracle') fetchAIPredictions();
   }, 30000);
@@ -161,7 +162,7 @@ function App() {
 
   const truncateAddress = (addr: string) => `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 
-  const fetchMarkets = useCallback(async (page = 1, searchQuery = '', cat = 'All', src = 'all') => {
+  const fetchMarkets = useCallback(async (page = 1, searchQuery = '', cat = 'All', src = 'all', sort = '') => {
     setLoading(true);
     setError(null);
     try {
@@ -169,6 +170,7 @@ function App() {
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
       if (cat !== 'All') params.set('category', cat);
       if (src !== 'all') params.set('source', src);
+      if (sort) params.set('sort', sort);
 
       const res = await fetch(`${API}/markets?${params}`);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
@@ -236,7 +238,7 @@ function App() {
 
   useEffect(() => {
     if (currentView === 'markets') {
-      fetchMarkets(1, search, category, source);
+      fetchMarkets(1, search, category, source, sortBy);
     }
     if (currentView === 'oracle' || currentView === 'markets') {
       fetchAIPredictions();
@@ -244,13 +246,13 @@ function App() {
     if (currentView === 'daily') {
       fetchDailyData();
     }
-  }, [currentView, category, source, fetchMarkets, search, fetchDailyData, fetchAIPredictions]);
+  }, [currentView, category, source, sortBy, fetchMarkets, search, fetchDailyData, fetchAIPredictions]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
-      fetchMarkets(1, value, category, source);
+      fetchMarkets(1, value, category, source, sortBy);
     }, 400);
   };
 
@@ -396,6 +398,28 @@ function App() {
                     {CATEGORIES.map(cat => (
                       <button key={cat} className={`cat-btn ${category === cat ? 'active' : ''}`} onClick={() => setCategory(cat)}>{cat}</button>
                     ))}
+
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="sort-dropdown glass-effect"
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        padding: '0.4rem 1rem',
+                        borderRadius: '20px',
+                        marginLeft: '1rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="" style={{ color: 'black' }}>Sort By...</option>
+                      <option value="volume" style={{ color: 'black' }}>High Volume</option>
+                      <option value="liquidity" style={{ color: 'black' }}>High Liquidity</option>
+                      <option value="closing_soon" style={{ color: 'black' }}>Closing Soon</option>
+                      <option value="trending" style={{ color: 'black' }}>Trending</option>
+                    </select>
                   </div>
                   <div className="source-selector">
                     {SOURCES.map(src => (
