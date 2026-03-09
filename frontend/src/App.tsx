@@ -445,9 +445,27 @@ function App() {
                     </select>
                   </div>
                   <div className="source-selector">
-                    {SOURCES.map(src => (
-                      <button key={src.key} className={`src-btn ${source === src.key ? 'active' : ''}`} onClick={() => setSource(src.key)}>{src.icon} {src.label}</button>
-                    ))}
+                    <select
+                      value={source}
+                      onChange={(e) => setSource(e.target.value)}
+                      className="source-dropdown glass-effect"
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        padding: '0.4rem 1rem',
+                        borderRadius: '20px',
+                        marginLeft: '1rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {SOURCES.map(src => (
+                        <option key={src.key} value={src.key} style={{ color: 'black' }}>
+                          {src.icon} {src.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
