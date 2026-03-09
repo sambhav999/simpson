@@ -1,6 +1,6 @@
 
 
-export default function OracleView({ predictions, stats, loading, onMarketClick }: any) {
+export default function OracleView({ predictions, stats, loading, onMarketClick, oracleStatus, setOracleStatus }: any) {
     const accuracy = stats?.all_time?.homer_baba?.accuracy ? (stats.all_time.homer_baba.accuracy * 100).toFixed(1) : '0.0';
 
     return (
@@ -17,7 +17,27 @@ export default function OracleView({ predictions, stats, loading, onMarketClick 
                 <div className="stat-card oracle-border"><div>Alpha Advantage</div><div style={{ color: 'var(--accent-blue)' }}>+{(stats?.all_time?.homer_advantage * 100 || 0).toFixed(1)}%</div></div>
             </div>
 
-            <h2>Latest Oracle Insights</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ margin: 0 }}>Latest Oracle Insights</h2>
+                <select
+                    value={oracleStatus}
+                    onChange={(e) => setOracleStatus(e.target.value)}
+                    className="glass-effect"
+                    style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white',
+                        border: '1px solid rgba(175,82,222,0.3)',
+                        padding: '0.4rem 1rem',
+                        borderRadius: '20px',
+                        outline: 'none',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <option value="pending" style={{ color: 'black' }}>🟢 Active Predictions</option>
+                    <option value="resolved" style={{ color: 'black' }}>⏳ Expired Predictions (Past 50)</option>
+                </select>
+            </div>
+
             {loading ? (
                 <div className="state-container">
                     <div className="spinner" />

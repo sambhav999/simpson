@@ -95,6 +95,7 @@ function App() {
   // AI Oracle State
   const [aiPredictions, setAIPredictions] = useState<AIPrediction[]>([]);
   const [aiLoading, setAILoading] = useState(false);
+  const [oracleStatus, setOracleStatus] = useState('pending'); // 'pending' (Active) or 'resolved' (Expired)
 
   // Wallet Adapters integration
   const { publicKey, select, disconnect, wallets } = useWallet();
@@ -122,7 +123,7 @@ function App() {
   useInterval(() => {
     if (currentView === 'markets') fetchMarkets(pagination.page, search, category, source, sortBy);
     if (currentView === 'daily') fetchDailyData();
-    if (currentView === 'oracle') fetchAIPredictions();
+    if (currentView === 'oracle') fetchAIPredictions(oracleStatus);
   }, 30000);
 
   useEffect(() => {
@@ -227,10 +228,11 @@ function App() {
     }
   }, [walletAddress]);
 
-  const fetchAIPredictions = useCallback(async () => {
+  const fetchAIPredictions = useCallback(async (statusArg = 'pending') => {
     setAILoading(true);
     try {
-      const resp = await fetch(`${API}/api/predictions/ai?limit=20`);
+      const limit = statusArg === 'resolved' ? 50 : 20;
+      const resp = await fetch(`${API}/api/predictions/ai?limit=${limit}&status=${statusArg}`);
       if (resp.ok) {
         const data = await resp.json();
         setAIPredictions(data.predictions || []);
@@ -247,12 +249,12 @@ function App() {
       fetchMarkets(1, search, category, source, sortBy);
     }
     if (currentView === 'oracle' || currentView === 'markets') {
-      fetchAIPredictions();
+      fetchAIPredictions(oracleStatus);
     }
     if (currentView === 'daily') {
       fetchDailyData();
     }
-  }, [currentView, category, source, sortBy, fetchMarkets, search, fetchDailyData, fetchAIPredictions]);
+  }, [currentView, category, source, sortBy, fetchMarkets, search, fetchDailyData, fetchAIPredictions, oracleStatus]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -545,6 +547,8 @@ function App() {
               stats={dailyScoreboard}
               loading={aiLoading}
               onMarketClick={handleMarketClick}
+              oracleStatus={oracleStatus}
+              setOracleStatus={setOracleStatus}
             />
           )}
         </ErrorBoundary>
