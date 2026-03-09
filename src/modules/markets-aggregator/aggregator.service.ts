@@ -528,50 +528,8 @@ export class AggregatorService {
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
-            logger.warn(`Failed to fetch from Kalshi (${message}). Providing fallback Kalshi data.`);
-
-            // Fallback dataset when API fails/blocks IP
-            return [
-                {
-                    id: 'KAL-FED-RATES-DEC',
-                    title: 'Will the Fed cut interest rates in December?',
-                    description: 'Settles YES if the Federal Reserve announces a rate cut in December 2026.',
-                    yesTokenMint: 'KAL_YES_FEDDEC',
-                    noTokenMint: 'KAL_NO_FEDDEC',
-                    expiry: '2026-12-18T20:00:00Z',
-                    status: 'active',
-                    category: 'Economics',
-                    image: this.getRandomFallback('Politics'),
-                    prices: [0.60, 0.40],
-                    source: 'kalshi'
-                },
-                {
-                    id: 'KAL-US-GDP-Q4',
-                    title: 'Will US Q4 GDP growth exceed 2.0%?',
-                    description: 'Based on the BEA advance estimate.',
-                    yesTokenMint: 'KAL_YES_GDPQ4',
-                    noTokenMint: 'KAL_NO_GDPQ4',
-                    expiry: '2027-01-28T13:30:00Z',
-                    status: 'active',
-                    category: 'Economics',
-                    image: this.getRandomFallback('General'),
-                    prices: [0.45, 0.55],
-                    source: 'kalshi'
-                },
-                {
-                    id: 'KAL-OSCARS-BEST-PIC',
-                    title: 'Will "Dune: Messiah" win Best Picture?',
-                    description: 'Settles based on the 2027 Academy Awards results.',
-                    yesTokenMint: 'KAL_YES_OSCARS',
-                    noTokenMint: 'KAL_NO_OSCARS',
-                    expiry: '2027-03-15T04:00:00Z',
-                    status: 'active',
-                    category: 'Entertainment',
-                    image: this.getRandomFallback('Entertainment'),
-                    prices: [0.25, 0.75],
-                    source: 'kalshi'
-                }
-            ];
+            logger.warn(`Failed to fetch from Kalshi: ${message}`);
+            return [];
         }
     }
 
