@@ -84,6 +84,8 @@ model Market {
   @@index([yesTokenMint])
   @@index([noTokenMint])
   @@index([closesAt])
+  @@index([volume])
+  @@index([liquidity])
   @@map("markets")
 }
 

@@ -30,8 +30,12 @@ export function buildApp() {
     // Trust proxy (required behind load balancers like DigitalOcean/Render)
     app.set('trust proxy', 1);
 
-    app.use(helmet());
-    app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }));
+    app.use(helmet({ crossOriginResourcePolicy: false }));
+    app.use(cors({
+        origin: true, // Reflects the request origin, or use ['http://localhost:5173', 'https://...']
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        credentials: true
+    }));
     app.use(compression());
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true }));

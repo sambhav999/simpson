@@ -51,19 +51,44 @@ export class MarketsRepository {
     let updated = 0;
     let created = 0;
     const changedIds: string[] = [];
-    for (const market of markets) {
-      const existing = await this.prisma.market.findUnique({
-        where: { externalId: market.id },
-      });
-      const dbMarket = await this.upsertMarket(market);
-      if (!existing) {
-        created++;
-        changedIds.push(dbMarket.id);
-      } else if (existing.status !== market.status || existing.category !== market.category || existing.title !== market.title || existing.image !== market.image) {
-        updated++;
-        changedIds.push(dbMarket.id);
-      }
+
+    // Pre-fetch existing markets in one query to avoid N findUnique calls
+    const externalIds = markets.map(m => m.id);
+    const existingMarkets = await this.prisma.market.findMany({
+      where: { externalId: { in: externalIds } },
+      select: { id: true, externalId: true, status: true, category: true, title: true, image: true }
+    });
+
+    const existingMap = new Map(existingMarkets.map(m => [m.externalId, m]));
+
+    // Batch upserts to avoid overwhelming the DB, but still faster than serial
+    // We can't easily use createMany for upsert in Prisma, so we'll use Promise.all with chunks
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < markets.length; i += BATCH_SIZE) {
+      const chunk = markets.slice(i, i + BATCH_SIZE);
+      await Promise.all(chunk.map(async (market) => {
+        const existing = existingMap.get(market.id);
+
+        let needsUpdate = !existing;
+        if (existing) {
+          needsUpdate = existing.status !== market.status ||
+            existing.category !== market.category ||
+            existing.title !== market.title ||
+            existing.image !== market.image;
+        }
+
+        if (needsUpdate) {
+          const dbMarket = await this.upsertMarket(market);
+          if (!existing) {
+            created++;
+          } else {
+            updated++;
+          }
+          changedIds.push(dbMarket.id);
+        }
+      }));
     }
+
     logger.info(`Market sync: ${created} created, ${updated} updated`);
     return { created, updated, changedIds };
   }
