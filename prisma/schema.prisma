@@ -86,6 +86,7 @@ model Market {
   @@index([closesAt])
   @@index([volume])
   @@index([liquidity])
+  @@index([status, volume(sort: Desc), liquidity(sort: Desc)])
   @@map("markets")
 }
 

@@ -61,12 +61,12 @@ export class MarketsRepository {
 
     const existingMap = new Map(existingMarkets.map(m => [m.externalId, m]));
 
-    // Batch upserts to avoid overwhelming the DB, but still faster than serial
-    // We can't easily use createMany for upsert in Prisma, so we'll use Promise.all with chunks
+    // Batch upserts to avoid overwhelming the DB
+    // Using sequential iteration to prevent connection pool exhaustion during background syncs
     const BATCH_SIZE = 50;
     for (let i = 0; i < markets.length; i += BATCH_SIZE) {
       const chunk = markets.slice(i, i + BATCH_SIZE);
-      await Promise.all(chunk.map(async (market) => {
+      for (const market of chunk) {
         const existing = existingMap.get(market.id);
 
         let needsUpdate = !existing;
@@ -86,7 +86,7 @@ export class MarketsRepository {
           }
           changedIds.push(dbMarket.id);
         }
-      }));
+      }
     }
 
     logger.info(`Market sync: ${created} created, ${updated} updated`);

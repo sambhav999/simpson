@@ -29,12 +29,13 @@ export class PredictionsService {
             this.prisma.aIPrediction.count({ where }),
         ]);
 
-        // Calculate stats
-        const allResolved = await this.prisma.aIPrediction.findMany({
-            where: { resolved: true },
-        });
-        const wins = allResolved.filter(p => p.result === 'WIN').length;
-        const losses = allResolved.filter(p => p.result === 'LOSS').length;
+        // Calculate stats directly via DB counts instead of fetching all records
+        const [wins, losses, pending] = await Promise.all([
+            this.prisma.aIPrediction.count({ where: { resolved: true, result: 'WIN' } }),
+            this.prisma.aIPrediction.count({ where: { resolved: true, result: 'LOSS' } }),
+            this.prisma.aIPrediction.count({ where: { resolved: false } })
+        ]);
+        const totalResolved = wins + losses;
 
         return {
             predictions: predictions.map(p => ({
@@ -53,10 +54,10 @@ export class PredictionsService {
                 result: p.result,
             })),
             stats: {
-                total_predictions: allResolved.length + await this.prisma.aIPrediction.count({ where: { resolved: false } }),
+                total_predictions: totalResolved + pending,
                 wins,
                 losses,
-                accuracy: allResolved.length > 0 ? wins / allResolved.length : 0,
+                accuracy: totalResolved > 0 ? wins / totalResolved : 0,
             },
             total,
             limit,
@@ -143,12 +144,11 @@ export class PredictionsService {
             this.prisma.position.count({ where }),
         ]);
 
-        const allPositions = await this.prisma.position.findMany({
-            where: { walletAddress: userId },
-        });
-        const wins = allPositions.filter(p => p.status === 'WON').length;
-        const losses = allPositions.filter(p => p.status === 'LOST').length;
-        const active = allPositions.filter(p => p.status === 'ACTIVE').length;
+        const [wins, losses, active] = await Promise.all([
+            this.prisma.position.count({ where: { walletAddress: userId, status: 'WON' } }),
+            this.prisma.position.count({ where: { walletAddress: userId, status: 'LOST' } }),
+            this.prisma.position.count({ where: { walletAddress: userId, status: 'ACTIVE' } })
+        ]);
 
         return {
             predictions: predictions.map(p => ({
@@ -164,7 +164,7 @@ export class PredictionsService {
                 status: p.status,
             })),
             stats: {
-                total: allPositions.length,
+                total: wins + losses + active,
                 wins,
                 losses,
                 active,
