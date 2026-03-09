@@ -74,7 +74,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [source, setSource] = useState('all');
-  const [sortBy, setSortBy] = useState('');
+  const [sortBy, setSortBy] = useState('trending');
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle'>('markets');
 
@@ -414,11 +414,11 @@ function App() {
                         cursor: 'pointer'
                       }}
                     >
-                      <option value="" style={{ color: 'black' }}>Sort By...</option>
+                      <option value="" disabled style={{ color: 'black' }}>Sort By...</option>
+                      <option value="trending" style={{ color: 'black' }}>🔥 Trending</option>
                       <option value="volume" style={{ color: 'black' }}>High Volume</option>
                       <option value="liquidity" style={{ color: 'black' }}>High Liquidity</option>
-                      <option value="closing_soon" style={{ color: 'black' }}>Closing Soon</option>
-                      <option value="trending" style={{ color: 'black' }}>Trending</option>
+                      <option value="closing_soon" style={{ color: 'black' }}>⏳ Closing Soon</option>
                     </select>
                   </div>
                   <div className="source-selector">
