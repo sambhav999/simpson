@@ -442,9 +442,8 @@ export class AggregatorService {
             const limit = 100;
             let hasMore = true;
 
-            // Fetch up to 100 events to prevent massive overload. 
-            // Since events can have dozens of nested markets, 100 events yields ~1500 markets.
-            while (hasMore && offset < 100) {
+            // Fetch up to 500 events to prevent massive overload, but gets "all" major active ones
+            while (hasMore && offset < 500) {
                 const response = await this.polymarketClient.get(`/events?active=true&closed=false&limit=${limit}&offset=${offset}`);
                 const events = response.data;
 
