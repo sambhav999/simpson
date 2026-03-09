@@ -64,32 +64,40 @@ export class OracleSyncJob {
             priceMap.set(update.id, actualPrice);
         }
 
-        // Rough heuristic to pair a market with an oracle price and calculate "divergence"
-        // Since this is a prediction market, "divergence" might represent the crowd's YES probability vs an AI/Baba model.
-        // For MVP, we mock a "Baba" probability using the oracle price modulo 100 as a percentage (just to populate the score).
+        // Batch updates to avoid blocking the event loop or overwhelming the DB
+        const BATCH_SIZE = 100;
+        let processedCount = 0;
 
-        for (const market of markets) {
-            let feedId = PYTH_FEEDS['Crypto'];
-            if (market.title.toLowerCase().includes('sol')) feedId = PYTH_FEEDS['Solana'];
+        for (let i = 0; i < markets.length; i += BATCH_SIZE) {
+            const batch = markets.slice(i, i + BATCH_SIZE);
 
-            const oraclePrice = priceMap.get(feedId) || null;
-            if (oraclePrice) {
-                // Mock probability for demonstration
-                const babaProbability = (oraclePrice % 100) / 100; // e.g. 0.45
+            await Promise.all(batch.map(async (market) => {
+                let feedId = PYTH_FEEDS['Crypto'];
+                if (market.title.toLowerCase().includes('sol')) feedId = PYTH_FEEDS['Solana'];
 
-                // Assume the Crowd thinks YES is 50% (0.5) if we don't have DFlow AMM odds locally
-                const crowdProbability = 0.5;
+                const oraclePrice = priceMap.get(feedId) || null;
+                if (oraclePrice) {
+                    const babaProbability = (oraclePrice % 100) / 100;
+                    const crowdProbability = 0.5;
+                    const divergenceScore = Math.abs(crowdProbability - babaProbability);
 
-                const divergenceScore = Math.abs(crowdProbability - babaProbability);
+                    await this.prisma.market.update({
+                        where: { id: market.id },
+                        data: {
+                            oraclePrice,
+                            divergenceScore
+                        }
+                    });
+                }
+            }));
 
-                await this.prisma.market.update({
-                    where: { id: market.id },
-                    data: {
-                        oraclePrice,
-                        divergenceScore
-                    }
-                });
+            processedCount += batch.length;
+            if (processedCount % 1000 === 0 || processedCount === markets.length) {
+                logger.debug(`[OracleSyncJob] Progress: ${processedCount}/${markets.length} markets updated`);
             }
+
+            // Yield control back to the event loop
+            await new Promise(resolve => setTimeout(resolve, 10));
         }
 
         logger.info(`[OracleSyncJob] Updated divergences for ${markets.length} markets`);
