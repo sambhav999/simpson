@@ -456,7 +456,6 @@ function App() {
                       <option value="trending" style={{ color: 'black' }}>🔥 Trending</option>
                       <option value="volume" style={{ color: 'black' }}>High Volume</option>
                       <option value="liquidity" style={{ color: 'black' }}>High Liquidity</option>
-                      <option value="closing_soon" style={{ color: 'black' }}>⏳ Closing Soon</option>
                     </select>
                   </div>
                   <div className="source-selector">

@@ -120,11 +120,6 @@ export class MarketsRepository {
         case 'liquidity':
           orderBy = { liquidity: 'desc' };
           break;
-        case 'closing_soon':
-          orderBy = { expiry: 'asc' };
-          if (!where['status']) where['status'] = 'active';
-          where['expiry'] = { gt: new Date() }; // Only show future closures
-          break;
         case 'trending':
           orderBy = [{ volume: 'desc' }, { liquidity: 'desc' }];
           break;
