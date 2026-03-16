@@ -221,9 +221,7 @@ export class AggregatorService {
                         category: (m.categories && m.categories.length > 0)
                             ? m.categories[0]
                             : 'General',
-                        image: m.image && !m.image.includes('placeholder')
-                            ? m.image
-                            : ArtService.getMarketArt(`LMT-${m.id}`, m.title, (m.categories?.[0] || 'General')),
+                        image: m.image || m.creator?.imageURI || ArtService.getMarketArt(`LMT-${m.id}`, m.title, (m.categories?.[0] || 'General')),
                         volume: m.volumeFormatted || undefined,
                         liquidity: m.liquidityFormatted || undefined,
                         prices: m.prices || undefined,
@@ -454,7 +452,7 @@ export class AggregatorService {
                     expiry: m.close_time ? new Date(m.close_time).toISOString() : null,
                     status: 'active',
                     category: m.category || 'Kalshi',
-                    image: ArtService.getMarketArt(`KAL-${m.ticker}`, m.title || m.ticker, m.category || 'Kalshi'),
+                    image: m.image_url || ArtService.getMarketArt(`KAL-${m.ticker}`, m.title || m.ticker, m.category || 'Kalshi'),
                     volume: m.volume ? String(m.volume) : undefined,
                     liquidity: m.liquidity ? String(m.liquidity) : undefined,
                     prices: [

@@ -12,23 +12,14 @@ export class ArtService {
         
         // Extract keywords from title for better relevance
         const keywords = this.extractKeywords(title, normalizedCategory);
-        
-        // We use the https://images.unsplash.com/source API keywords logic
-        // But since source.unsplash is flaky, we'll use a curated list of reliable templates
-        // and a randomizer based on the seed.
-        
         const style = this.getStyleForCategory(normalizedCategory);
         
-        // This URL format is highly compatible and supports search + random sig
-        // Using source.unsplash.com/featured/?{keywords} as a reliable redirector
-        // We'll add a sig parameter to ensure uniqueness per marketId
-        const encodedKeywords = encodeURIComponent(`${normalizedCategory},${keywords},${style}`);
+        // Switch to LoremFlickr for better reliability as Unsplash Source is deprecated
+        // Format: https://loremflickr.com/g/800/600/keywords/all?lock=seed
+        const combinedKeywords = `${normalizedCategory},${keywords},${style}`.replace(/ /g, '');
+        const lock = this.stringToNumber(seed) % 10000;
         
-        // sig ensures that different markets with same keywords get different images
-        // but the same market always gets the same image.
-        const sig = this.stringToNumber(seed);
-        
-        return `https://source.unsplash.com/featured/800x600?${encodedKeywords}&sig=${sig}`;
+        return `https://loremflickr.com/800/600/${combinedKeywords}/all?lock=${lock}`;
     }
 
     private static normalizeCategory(category: string): string {
@@ -38,14 +29,14 @@ export class ArtService {
         if (cat.includes('sports')) return 'sports';
         if (cat.includes('entertainment')) return 'cinema';
         if (cat.includes('tech')) return 'technology';
-        return 'abstract';
+        return 'business';
     }
 
     private static extractKeywords(title: string, category: string): string {
-        // Simple extraction: take first 2-3 words that aren't stop words
-        const stops = new Set(['will', 'the', 'a', 'to', 'in', 'on', 'with', 'by', 'is', 'at', 'reach', 'reach', 'handle', 'exceed', 'price', 'be', 'market', 'high', 'low']);
+        // Simple extraction: take first 2 words, stripping non-alphanumeric characters
+        const stops = new Set(['will', 'the', 'a', 'to', 'in', 'on', 'with', 'by', 'is', 'at', 'reach', 'handle', 'exceed', 'price', 'be', 'market', 'high', 'low']);
         const words = title.toLowerCase()
-            .replace(/[?.,!]/g, '')
+            .replace(/[^a-z0-9 ]/g, '') // Strip everything except letters, numbers, and spaces
             .split(' ')
             .filter(w => w.length > 3 && !stops.has(w));
             

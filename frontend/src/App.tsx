@@ -512,8 +512,8 @@ function App() {
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
-                              if (!target.src.includes('sig=')) { // Prevent infinite loops
-                                target.src = `https://source.unsplash.com/featured/800x600?cryptocurrency,abstract&sig=${p.id}`;
+                              if (!target.src.includes('lock=')) { // Prevent infinite loops
+                                target.src = `https://loremflickr.com/800/600/cryptocurrency,abstract/all?lock=${p.id.length * 7}`;
                               }
                             }}
                           />
@@ -632,8 +632,8 @@ function App() {
                             className="market-image-img"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
-                              if (!target.src.includes('sig=')) {
-                                target.src = `https://source.unsplash.com/featured/800x600?abstract&sig=${m.id}`;
+                              if (!target.src.includes('lock=')) {
+                                target.src = `https://loremflickr.com/800/600/abstract/all?lock=${m.id.length * 13}`;
                               }
                             }}
                           />

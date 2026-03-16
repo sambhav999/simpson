@@ -48,7 +48,15 @@ export default function OracleView({ predictions, misses, stats, loading, onMark
                     {predictions.map((p: any) => (
                         <div key={p.id} className="daily-card aura-border" style={{ padding: '1.5rem', cursor: 'pointer' }} onClick={() => onMarketClick(p.market)}>
                             <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
-                                <div className="oracle-market-img" style={{ backgroundImage: `url(${p.market.image || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80'})` }}></div>
+                                <div 
+                                    className="oracle-market-img" 
+                                    style={{ 
+                                        backgroundImage: `url(${p.market.image || 'https://loremflickr.com/800/600/abstract/all?lock=1'})` 
+                                    }}
+                                    onError={(e: any) => {
+                                        e.target.style.backgroundImage = `url(https://loremflickr.com/800/600/abstract/all?lock=${p.id.length})`;
+                                    }}
+                                ></div>
                                 <div style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)'}`, textAlign: 'center', minWidth: '80px' }}>
                                     <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)' }}>{p.prediction}</div>
                                 </div>
@@ -89,7 +97,18 @@ export default function OracleView({ predictions, misses, stats, loading, onMark
                         {misses.map((m: any) => (
                             <div key={m.id} className="stat-card glass-effect" style={{ border: '1px solid rgba(255,255,255,0.05)', textAlign: 'left' }}>
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-                                    <div style={{ width: '40px', height: '40px', borderRadius: '4px', backgroundImage: `url(${m.market.image})`, backgroundSize: 'cover' }}></div>
+                                    <div 
+                                        style={{ 
+                                            width: '40px', 
+                                            height: '40px', 
+                                            borderRadius: '4px', 
+                                            backgroundImage: `url(${m.market.image})`, 
+                                            backgroundSize: 'cover' 
+                                        }}
+                                        onError={(e: any) => {
+                                            e.target.style.backgroundImage = 'url(https://loremflickr.com/200/200/abstract/all?lock=miss)';
+                                        }}
+                                    ></div>
                                     <h4 style={{ margin: 0, fontSize: '0.9rem', flex: 1 }}>{m.market.question}</h4>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', opacity: 0.7 }}>

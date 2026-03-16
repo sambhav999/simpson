@@ -90,7 +90,15 @@ export default function DailyChallengesView({
                         const myPick = isLocked ? m.user_prediction : userPredictions[m.id];
                         return (
                             <div key={m.id} className="daily-card" style={{ display: 'flex', gap: '2rem', marginBottom: '1rem', alignItems: 'center' }}>
-                                <div className="arena-market-img" style={{ backgroundImage: `url(${m.market.image_url || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80'})` }}></div>
+                                <div 
+                                    className="arena-market-img" 
+                                    style={{ 
+                                        backgroundImage: `url(${m.market.image_url || m.market.image || 'https://loremflickr.com/800/600/abstract/all?lock=1'})` 
+                                    }}
+                                    onError={(e: any) => {
+                                        e.target.style.backgroundImage = `url(https://loremflickr.com/800/600/abstract/all?lock=${m.id.length})`;
+                                    }}
+                                ></div>
                                 <div style={{ flex: 1 }}>
                                     <h4>{idx + 1}. {m.market.question}</h4>
                                     <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
