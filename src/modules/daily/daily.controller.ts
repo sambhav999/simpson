@@ -41,9 +41,9 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
                 return res.json({ message: 'Not enough active markets to generate a daily battle today', markets: [] });
             }
 
-            // Shuffle and pick 10-20
+            // Shuffle and pick 36
             const shuffled = unfeaturedMarkets.sort(() => 0.5 - Math.random());
-            const numMarkets = Math.floor(Math.random() * 11) + 10; // 10 to 20
+            const numMarkets = 36;
             const selectedMarkets = shuffled.slice(0, numMarkets);
 
             battle = await prisma.dailyBattle.create({
