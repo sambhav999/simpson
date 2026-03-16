@@ -1,5 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HttpServer } from 'http';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { RedisService } from '../config/redis.service';
 import { logger } from '../logger/logger';
 
 export enum SocketEvent {
@@ -34,9 +36,15 @@ export class SocketService {
       },
     });
 
+    // Redis Adapter for Multi-Node Scalability
+    const pubClient = RedisService.getNewInstance();
+    const subClient = RedisService.getNewInstance();
+    this.io.adapter(createAdapter(pubClient, subClient));
+
     this.io.on('connection', (socket) => {
       logger.info(`Client connected: ${socket.id}`);
       
+      // Auto-join personal room for direct notification and views
       socket.on('join', (room: string) => {
         socket.join(room);
         logger.debug(`Client ${socket.id} joined room: ${room}`);
@@ -52,7 +60,7 @@ export class SocketService {
       });
     });
 
-    logger.info('Socket.io initialized');
+    logger.info('Socket.io initialized with Redis Adapter');
   }
 
   public broadcast(event: SocketEvent, data: any): void {

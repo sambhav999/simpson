@@ -1,17 +1,28 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { PrismaService } from '../../core/config/prisma.service';
+import { RedisService } from '../../core/config/redis.service';
 import { requireAuth, optionalAuth } from '../../core/config/auth.middleware';
+import { logger } from '../../core/logger/logger';
 import { AppError } from '../../core/config/error.handler';
 
 const router = Router();
 const prisma = PrismaService.getInstance();
+const redis = RedisService.getInstance();
+const CACHE_TTL = 300; // 5 minutes
 
 // GET /api/daily — Today's Daily battle
 router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+
+        // Try Cache first if not logged in (personal stats break global cache)
+        const cacheKey = `daily:battle:${req.user ? req.user.wallet : 'guest'}`;
+        if (!req.user) {
+            const cached = await redis.get('daily:battle:global');
+            if (cached) return res.json(JSON.parse(cached));
+        }
 
         let battle = await prisma.dailyBattle.findFirst({
             orderBy: { date: 'desc' },
@@ -86,7 +97,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
 
         const userPredMap = new Map(userPredictions.map(p => [p.dailyBattleMarketId, p.prediction]));
 
-        res.json({
+        const responseData = {
             id: battle.id,
             date: battle.date,
             status: battle.status,
@@ -114,7 +125,14 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
                 participated: userPredictions.length > 0,
                 predictions_made: userPredictions.length,
             },
-        });
+        };
+
+        // Cache global version for 5 mins
+        if (!req.user) {
+            await redis.setex('daily:battle:global', CACHE_TTL, JSON.stringify(responseData));
+        }
+
+        res.json(responseData);
     } catch (err) {
         next(err);
     }
@@ -175,6 +193,10 @@ router.post('/predict', requireAuth, async (req: Request, res: Response, next: N
 // GET /api/daily/scoreboard — AI vs Community scoreboard
 router.get('/scoreboard', async (_req: Request, res: Response, next: NextFunction) => {
     try {
+        const cacheKey = 'daily:scoreboard';
+        const cached = await redis.get(cacheKey);
+        if (cached) return res.json(JSON.parse(cached));
+
         const [homerWins, homerTotal, communityWins, communityTotal] = await Promise.all([
             prisma.dailyBattleMarket.count({ where: { result: 'WIN' } }),
             prisma.dailyBattleMarket.count({ where: { result: { in: ['WIN', 'LOSS'] } } }),
@@ -182,7 +204,7 @@ router.get('/scoreboard', async (_req: Request, res: Response, next: NextFunctio
             prisma.userDailyPrediction.count({ where: { result: { in: ['WIN', 'LOSS'] } } }),
         ]);
 
-        res.json({
+        const result = {
             all_time: {
                 homer_baba: {
                     total_predictions: homerTotal,
@@ -199,7 +221,10 @@ router.get('/scoreboard', async (_req: Request, res: Response, next: NextFunctio
                 homer_advantage: homerTotal > 0 && communityTotal > 0
                     ? (homerWins / homerTotal) - (communityWins / communityTotal) : 0,
             },
-        });
+        };
+
+        await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(result));
+        res.json(result);
     } catch (err) {
         next(err);
     }
@@ -240,6 +265,9 @@ router.get('/user/stats', requireAuth, async (req: Request, res: Response, next:
 router.get('/leaderboard', async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { limit = '50' } = req.query;
+        const cacheKey = `daily:leaderboard:${limit}`;
+        const cached = await redis.get(cacheKey);
+        if (cached) return res.json(JSON.parse(cached));
 
         // Aggregate user daily prediction wins
         const results = await prisma.userDailyPrediction.groupBy({
@@ -275,7 +303,7 @@ router.get('/leaderboard', async (req: Request, res: Response, next: NextFunctio
         });
         const userMap = new Map(users.map(u => [u.walletAddress, u]));
 
-        res.json({
+        const result = {
             leaderboard: leaderboard.map((l, idx) => {
                 const user = userMap.get(l.userId);
                 return {
@@ -290,7 +318,10 @@ router.get('/leaderboard', async (req: Request, res: Response, next: NextFunctio
                     accuracy: l.accuracy,
                 };
             }),
-        });
+        };
+
+        await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(result));
+        res.json(result);
     } catch (err) {
         next(err);
     }

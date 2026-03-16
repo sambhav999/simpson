@@ -86,9 +86,9 @@ export class ExternalStreamsService {
             marketId: msg.data.id,
             data: msg.data,
           };
-          // Emit to specific market room AND general markets room
+          // Emit to specific market room AND global markets discovery room
           this.socketService.emitToRoom(`market:${msg.data.id}`, SocketEvent.MARKET_UPDATE, payload);
-          this.socketService.broadcast(SocketEvent.MARKET_UPDATE, payload);
+          this.socketService.emitToRoom('markets:all', SocketEvent.MARKET_UPDATE, payload);
         }
       } catch (err) {
         logger.error('Error parsing Polymarket message', err);

@@ -48,6 +48,9 @@ export class PredictionsService {
                 },
                 prediction: p.prediction,
                 confidence: p.confidence,
+                summary_commentary: p.summaryCommentary,
+                bullish_commentary: p.bullishCommentary,
+                bearish_commentary: p.bearishCommentary,
                 commentary: p.commentary,
                 created_at: p.createdAt,
                 resolved: p.resolved,
@@ -122,6 +125,35 @@ export class PredictionsService {
             xp_awarded: 20,
             redirect_url: redirectUrl,
         };
+    }
+
+    async getBigMisses(limit = 10) {
+        const misses = await this.prisma.aIPrediction.findMany({
+            where: { resolved: true, result: 'LOSS' },
+            include: { market: { include: { positions: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+        });
+
+        return misses.map(m => {
+            const communityWins = m.market.positions.filter(p => p.status === 'WON').length;
+            const totalCommunity = m.market.positions.filter(p => p.status !== 'ACTIVE').length;
+
+            return {
+                id: m.id,
+                market: {
+                    id: m.market.id,
+                    question: m.market.title,
+                    image: m.market.image,
+                },
+                oracle_prediction: m.prediction,
+                oracle_confidence: m.confidence,
+                summary: m.summaryCommentary,
+                community_accuracy: totalCommunity > 0 ? communityWins / totalCommunity : 0,
+                community_wins: communityWins,
+                resolved_at: m.market.updatedAt,
+            };
+        });
     }
 
     /**

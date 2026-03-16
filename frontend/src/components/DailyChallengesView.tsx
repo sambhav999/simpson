@@ -97,7 +97,18 @@ export default function DailyChallengesView({
                                         <div style={{ flex: 1, padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
                                             <div style={{ color: 'var(--accent-purple)', fontSize: '0.7rem' }}>HOMER'S PICK</div>
                                             <div style={{ fontWeight: 'bold' }}>{m.homer_prediction} ({m.homer_confidence}%)</div>
-                                            <p style={{ fontStyle: 'italic', fontSize: '0.8rem' }}>"{m.homer_commentary}"</p>
+                                            <p style={{ fontStyle: 'italic', fontSize: '0.8rem', marginBottom: '0.8rem' }}>"{m.homer_commentary || 'Homer Baba detects strong currents...'}"</p>
+                                            
+                                            {(m.bullish_commentary || m.bearish_commentary) && (
+                                                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                                    <div style={{ flex: 1, fontSize: '0.65rem', padding: '0.4rem', background: 'rgba(175,82,222,0.08)', borderRadius: '4px', borderLeft: '2px solid var(--accent-purple)' }}>
+                                                        <span style={{ fontWeight: 'bold', color: 'var(--accent-purple)' }}>BULL:</span> {m.bullish_commentary?.slice(0, 60)}...
+                                                    </div>
+                                                    <div style={{ flex: 1, fontSize: '0.65rem', padding: '0.4rem', background: 'rgba(0,122,255,0.08)', borderRadius: '4px', borderLeft: '2px solid var(--accent-blue)' }}>
+                                                        <span style={{ fontWeight: 'bold', color: 'var(--accent-blue)' }}>BEAR:</span> {m.bearish_commentary?.slice(0, 60)}...
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                             <button className={`dm-btn yes-btn ${myPick === 'YES' ? 'selected' : ''}`} disabled={isLocked} onClick={() => handlePrediction(m.id, 'YES')}>YES</button>

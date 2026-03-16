@@ -57,4 +57,15 @@ router.get('/user/:userId', async (req: Request, res: Response, next: NextFuncti
     }
 });
 
+// GET /api/predictions/misses — When AI was wrong
+router.get('/misses', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { limit = '10' } = req.query;
+        const misses = await predictionsService.getBigMisses(Number(limit));
+        res.json(misses);
+    } catch (err) {
+        next(err);
+    }
+});
+
 export { router as predictionsRouter };

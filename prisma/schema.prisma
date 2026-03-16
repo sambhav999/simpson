@@ -132,10 +132,13 @@ model Trade {
 model AIPrediction {
   id           String   @id @default(cuid())
   marketId     String   @map("market_id")
-  prediction   String
-  confidence   Int
-  commentary   String   @db.VarChar(280)
-  featured     Boolean  @default(false)
+  prediction       String
+  confidence       Int
+  summaryCommentary String?  @map("summary_commentary") @db.VarChar(500)
+  bullishCommentary String?  @map("bullish_commentary") @db.VarChar(500)
+  bearishCommentary String?  @map("bearish_commentary") @db.VarChar(500)
+  commentary       String?  @db.VarChar(280) // Keeping for backwards compat during migration if needed, but will phase out
+  featured         Boolean  @default(false)
   featuredRank Int?     @map("featured_rank")
   resolved     Boolean  @default(false)
   result       String   @default("PENDING")
@@ -266,10 +269,12 @@ model DailyBattleMarket {
   dailyBattleId   String                @map("daily_battle_id")
   marketId        String                @map("market_id")
   position        Int
-  homerPrediction String                @map("homer_prediction")
-  homerConfidence Int                   @map("homer_confidence")
-  homerCommentary String?               @map("homer_commentary") @db.VarChar(280)
-  result          String                @default("PENDING")
+  homerPrediction  String                @map("homer_prediction")
+  homerConfidence  Int                   @map("homer_confidence")
+  homerCommentary  String?               @map("homer_commentary") @db.VarChar(500)
+  bullishCommentary String?               @map("bullish_commentary") @db.VarChar(500)
+  bearishCommentary String?               @map("bearish_commentary") @db.VarChar(500)
+  result           String                @default("PENDING")
   createdAt       DateTime              @default(now()) @map("created_at")
   dailyBattle     DailyBattle           @relation(fields: [dailyBattleId], references: [id], onDelete: Cascade)
   market          Market                @relation(fields: [marketId], references: [id], onDelete: Cascade)

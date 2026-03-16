@@ -50,7 +50,10 @@ interface AIPrediction {
   market: { id: string; question: string; closes_at: string; image?: string };
   prediction: 'YES' | 'NO';
   confidence: number;
-  commentary: string;
+  commentary?: string | null;
+  summary_commentary?: string | null;
+  bullish_commentary?: string | null;
+  bearish_commentary?: string | null;
   resolved: boolean;
   result: 'WIN' | 'LOSS' | 'PENDING';
   created_at: string;
@@ -105,20 +108,10 @@ function App() {
 
   // AI Oracle State
   const [aiPredictions, setAIPredictions] = useState<AIPrediction[]>([]);
+  const [aiMisses, setAIMisses] = useState<any[]>([]);
   const [aiLoading, setAILoading] = useState(false);
   const [oracleStatus, setOracleStatus] = useState('pending'); // 'pending' (Active) or 'resolved' (Expired)
 
-  // Custom hook for polling (keep for compatibility if needed elsewhere, but disabled)
-  function useInterval(callback: () => void, delay: number | null) {
-    const savedCallback = useRef(callback);
-    useEffect(() => { savedCallback.current = callback; }, [callback]);
-    useEffect(() => {
-      if (delay !== null) {
-        const id = setInterval(() => savedCallback.current(), delay);
-        return () => clearInterval(id);
-      }
-    }, [delay]);
-  }
 
   // Wallet Adapters integration
   const { publicKey, select, disconnect, wallets } = useWallet();
@@ -129,6 +122,7 @@ function App() {
 
   const walletAddress = publicKey ? publicKey.toBase58() : null;
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchingRef = useRef<Record<string, boolean>>({});
 
   // WebSocket listeners
   useEffect(() => {
@@ -155,17 +149,28 @@ function App() {
 
   // Room management for real-time updates
   useEffect(() => {
+    // 1. Join Exploration room for list updates
+    if (currentView === 'markets') {
+      socket.emit('join', 'markets:all');
+      console.log('Joined room: markets:all');
+    }
+
+    // 2. Join specific market focus room
     if (selectedMarket) {
       const room = `market:${selectedMarket.id}`;
       socket.emit('join', room);
       console.log(`Joined room: ${room}`);
-
-      return () => {
-        socket.emit('leave', room);
-        console.log(`Left room: ${room}`);
-      };
     }
-  }, [selectedMarket]);
+
+    return () => {
+      if (currentView === 'markets') {
+        socket.emit('leave', 'markets:all');
+      }
+      if (selectedMarket) {
+        socket.emit('leave', `market:${selectedMarket.id}`);
+      }
+    };
+  }, [currentView, selectedMarket]);
 
   // Poll for market updates - DISABLED for WebSockets
   /*
@@ -220,6 +225,10 @@ function App() {
   const truncateAddress = (addr: string) => `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 
   const fetchMarkets = useCallback(async (page = 1, searchQuery = '', cat = 'All', src = 'all', sort = '', isAppend = false) => {
+    const fetchKey = `markets-${page}-${searchQuery}-${cat}-${src}-${sort}`;
+    if (fetchingRef.current[fetchKey]) return;
+    fetchingRef.current[fetchKey] = true;
+
     if (isAppend) setLoadingMore(true);
     else setLoading(true);
     setError(null);
@@ -236,7 +245,11 @@ function App() {
       
       const newMarkets = json.data || [];
       if (isAppend) {
-        setMarkets(prev => [...prev, ...newMarkets]);
+        setMarkets(prev => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const uniqueNew = newMarkets.filter((m: any) => !existingIds.has(m.id));
+          return [...prev, ...uniqueNew];
+        });
       } else {
         setMarkets(newMarkets);
       }
@@ -247,6 +260,7 @@ function App() {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      fetchingRef.current[fetchKey] = false;
     }
   }, []);
 
@@ -287,6 +301,10 @@ function App() {
   }, [walletAddress]);
 
   const fetchAIPredictions = useCallback(async (statusArg = 'pending') => {
+    const fetchKey = `ai-${statusArg}`;
+    if (fetchingRef.current[fetchKey]) return;
+    fetchingRef.current[fetchKey] = true;
+
     setAILoading(true);
     try {
       const limit = statusArg === 'resolved' ? 50 : 20;
@@ -299,6 +317,19 @@ function App() {
       console.error("Failed to fetch AI predictions", err);
     } finally {
       setAILoading(false);
+      fetchingRef.current[fetchKey] = false;
+    }
+  }, []);
+
+  const fetchAIMisses = useCallback(async () => {
+    try {
+      const resp = await fetch(`${API}/api/predictions/misses?limit=10`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setAIMisses(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch AI misses", err);
     }
   }, []);
 
@@ -308,11 +339,12 @@ function App() {
     }
     if (currentView === 'oracle' || currentView === 'markets') {
       fetchAIPredictions(oracleStatus);
+      fetchAIMisses();
     }
     if (currentView === 'daily') {
       fetchDailyData();
     }
-  }, [currentView, category, source, sortBy, fetchMarkets, search, fetchDailyData, fetchAIPredictions, oracleStatus]);
+  }, [currentView, category, source, sortBy, fetchMarkets, search, fetchDailyData, fetchAIPredictions, oracleStatus, fetchAIMisses]);
 
   // Infinite Scroll Observer
   useEffect(() => {
@@ -482,7 +514,7 @@ function App() {
                         </div>
                         <h3>{p.market.question}</h3>
                         <div className="card-prediction">Baba Suggests: <span className={p.prediction}>{p.prediction}</span></div>
-                        <p className="card-commentary">"{p.commentary.slice(0, 80)}..."</p>
+                        <p className="card-commentary">"{(p.summary_commentary || p.commentary || "The oracle is weighing the signals...").slice(0, 80)}..."</p>
                       </div>
                     ))}
                   </div>
@@ -645,6 +677,7 @@ function App() {
           {currentView === 'oracle' && (
             <OracleView
               predictions={aiPredictions}
+              misses={aiMisses}
               stats={dailyScoreboard}
               loading={aiLoading}
               onMarketClick={handleMarketClick}

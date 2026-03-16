@@ -41,4 +41,12 @@ export class RedisService {
     }
     return RedisService.bullmqConnection;
   }
+
+  static getNewInstance(): Redis {
+    return new Redis(config.REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      retryStrategy: (times) => Math.min(times * 100, 3000),
+      lazyConnect: true,
+    });
+  }
 }
