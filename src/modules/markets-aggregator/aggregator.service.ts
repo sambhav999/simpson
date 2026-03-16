@@ -4,7 +4,6 @@ import axiosRetry from 'axios-retry';
 import { config } from '../../core/config/config';
 import { logger } from '../../core/logger/logger';
 import { AppError } from '../../core/config/error.handler';
-import { ArtService } from '../art/art.service';
 
 // Shape returned by the Limitless /markets/active endpoint
 interface LimitlessMarketResponse {
@@ -81,7 +80,6 @@ export class AggregatorService {
     private readonly hedgehogClient: AxiosInstance;
     private readonly kalshiClient: AxiosInstance;
     private readonly sxbetClient: AxiosInstance;
-    private readonly artService = ArtService;
 
     constructor() {
         const limitlessHeaders: Record<string, string> = {};
@@ -221,7 +219,7 @@ export class AggregatorService {
                         category: (m.categories && m.categories.length > 0)
                             ? m.categories[0]
                             : 'General',
-                        image: m.image || m.creator?.imageURI || ArtService.getMarketArt(`LMT-${m.id}`, m.title, (m.categories?.[0] || 'General')),
+                        image: m.image || m.creator?.imageURI || undefined,
                         volume: m.volumeFormatted || undefined,
                         liquidity: m.liquidityFormatted || undefined,
                         prices: m.prices || undefined,
@@ -271,7 +269,7 @@ export class AggregatorService {
                 expiry: m.expiresAt || m.endTime || null,
                 status: 'active',
                 category: m.category || 'Solana',
-                image: m.image || ArtService.getMarketArt(`HDG-${m.id || m.address}`, m.title || m.name, m.category || 'Solana'),
+                image: m.image || undefined,
                 prices: m.prices || [0.5, 0.5],
                 source: 'hedgehog',
                 slug: m.slug || undefined
@@ -324,7 +322,7 @@ export class AggregatorService {
                 }
             ].map(m => ({
                 ...m,
-                image: ArtService.getMarketArt(m.id, m.title, m.category),
+                image: undefined,
                 source: 'hedgehog' as const
             }));
         }
@@ -349,7 +347,7 @@ export class AggregatorService {
                 expiry: m.closeTime ? new Date(m.closeTime).toISOString() : null,
                 status: m.isResolved ? 'resolved' : 'active',
                 category: (m.groupSlugs && m.groupSlugs.length > 0) ? m.groupSlugs[0] : 'Manifold',
-                image: m.coverImageUrl || ArtService.getMarketArt(`MNF-${m.id}`, m.question, (m.groupSlugs && m.groupSlugs.length > 0) ? m.groupSlugs[0] : 'Manifold'),
+                image: m.coverImageUrl || undefined,
                 volume: m.volume ? String(Math.round(m.volume)) : undefined,
                 liquidity: m.totalLiquidity ? String(Math.round(m.totalLiquidity)) : undefined,
                 prices: (typeof m.probability === 'number') ? [m.probability, 1 - m.probability] : undefined,
@@ -407,7 +405,7 @@ export class AggregatorService {
                             expiry: market.endDate || event.endDate || new Date(Date.now() + 86400000).toISOString(),
                             status: market.active ? 'active' : 'inactive',
                             category: (event.tags && event.tags.length > 0) ? event.tags[0].label || event.tags[0] : 'Polymarket',
-                            image: market.image || market.icon || event.image || event.icon || ArtService.getMarketArt(`POLY-${market.id || event.id}`, market.question || event.title, (event.tags && event.tags.length > 0) ? event.tags[0].label || event.tags[0] : 'Polymarket'),
+                            image: market.image || market.icon || event.image || event.icon || undefined,
                         });
                     }
                 }
@@ -452,7 +450,7 @@ export class AggregatorService {
                     expiry: m.close_time ? new Date(m.close_time).toISOString() : null,
                     status: 'active',
                     category: m.category || 'Kalshi',
-                    image: m.image_url || ArtService.getMarketArt(`KAL-${m.ticker}`, m.title || m.ticker, m.category || 'Kalshi'),
+                    image: m.image_url || undefined,
                     volume: m.volume ? String(m.volume) : undefined,
                     liquidity: m.liquidity ? String(m.liquidity) : undefined,
                     prices: [
@@ -502,7 +500,7 @@ export class AggregatorService {
                     expiry: m.gameTime ? new Date(m.gameTime * 1000).toISOString() : null,
                     status: m.status === 'ACTIVE' ? 'active' : 'inactive',
                     category: category,
-                    image: ArtService.getMarketArt(`SXB-${m.marketHash}`, title, category),
+                    image: undefined,
                     source: 'sxbet',
                     slug: m.sportLabel || undefined
                 };

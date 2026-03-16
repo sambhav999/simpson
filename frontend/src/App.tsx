@@ -506,16 +506,10 @@ function App() {
                         <div className="card-badge">HIGH CONFIDENCE {p.confidence}%</div>
                         <div className="featured-card-image">
                           <img 
-                            src={p.market.image || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80'} 
+                            src={p.market.image || ''} 
                             alt={p.market.question} 
                             loading="lazy"
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              if (!target.src.includes('lock=')) { // Prevent infinite loops
-                                target.src = `https://loremflickr.com/800/600/cryptocurrency,abstract/all?lock=${p.id.length * 7}`;
-                              }
-                            }}
                           />
                         </div>
                         <h3>{p.market.question}</h3>
@@ -626,16 +620,10 @@ function App() {
                       <div key={m.id} className="market-card glass-effect" onClick={() => handleMarketClick(m)}>
                         <div className="market-image-container">
                           <img 
-                            src={m.image || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&auto=format&fit=crop&q=60'} 
+                            src={m.image || ''} 
                             alt={m.title || m.question}
                             loading="lazy"
                             className="market-image-img"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              if (!target.src.includes('lock=')) {
-                                target.src = `https://loremflickr.com/800/600/abstract/all?lock=${m.id.length * 13}`;
-                              }
-                            }}
                           />
                           <div className="source-tag">{m.source}</div>
                         </div>

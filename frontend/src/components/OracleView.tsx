@@ -51,10 +51,7 @@ export default function OracleView({ predictions, misses, stats, loading, onMark
                                 <div 
                                     className="oracle-market-img" 
                                     style={{ 
-                                        backgroundImage: `url(${p.market.image || 'https://loremflickr.com/800/600/abstract/all?lock=1'})` 
-                                    }}
-                                    onError={(e: any) => {
-                                        e.target.style.backgroundImage = `url(https://loremflickr.com/800/600/abstract/all?lock=${p.id.length})`;
+                                        backgroundImage: `url(${p.market.image || ''})` 
                                     }}
                                 ></div>
                                 <div style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)'}`, textAlign: 'center', minWidth: '80px' }}>
@@ -102,11 +99,8 @@ export default function OracleView({ predictions, misses, stats, loading, onMark
                                             width: '40px', 
                                             height: '40px', 
                                             borderRadius: '4px', 
-                                            backgroundImage: `url(${m.market.image})`, 
+                                            backgroundImage: `url(${m.market.image || ''})`, 
                                             backgroundSize: 'cover' 
-                                        }}
-                                        onError={(e: any) => {
-                                            e.target.style.backgroundImage = 'url(https://loremflickr.com/200/200/abstract/all?lock=miss)';
                                         }}
                                     ></div>
                                     <h4 style={{ margin: 0, fontSize: '0.9rem', flex: 1 }}>{m.market.question}</h4>

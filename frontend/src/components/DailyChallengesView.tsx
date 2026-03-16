@@ -93,10 +93,7 @@ export default function DailyChallengesView({
                                 <div 
                                     className="arena-market-img" 
                                     style={{ 
-                                        backgroundImage: `url(${m.market.image_url || m.market.image || 'https://loremflickr.com/800/600/abstract/all?lock=1'})` 
-                                    }}
-                                    onError={(e: any) => {
-                                        e.target.style.backgroundImage = `url(https://loremflickr.com/800/600/abstract/all?lock=${m.id.length})`;
+                                        backgroundImage: `url(${m.market.image_url || m.market.image || ''})` 
                                     }}
                                 ></div>
                                 <div style={{ flex: 1 }}>
