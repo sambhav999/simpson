@@ -1,0 +1,10 @@
+
+> frontend@0.0.0 dev
+> vite --host 0.0.0.0
+
+
+  VITE v7.3.1  ready in 197 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.208.181.161:5173/
+  ➜  press h + enter to show help

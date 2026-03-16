@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { io } from 'socket.io-client';
 import './App.css';
 import { recordTrade } from './lib/api';
 
@@ -14,6 +15,7 @@ const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
 const TradeModal = lazy(() => import('./components/TradeModal'));
 
 const API = import.meta.env.VITE_BACKEND_URL;
+const socket = io(API);
 
 declare global {
   interface Window {
@@ -53,8 +55,6 @@ interface AIPrediction {
   created_at: string;
 }
 
-
-
 const CATEGORIES = [
   { value: 'All', label: 'All Categories' },
   { value: 'Crypto', label: 'Crypto' },
@@ -80,7 +80,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [source, setSource] = useState('all');
-  const [sortBy, setSortBy] = useState('trending');
+  const [sortBy, setSortBy] = useState('');
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle'>('markets');
   const [portfolioRefreshTrigger, setPortfolioRefreshTrigger] = useState(0);
@@ -98,17 +98,7 @@ function App() {
   const [aiLoading, setAILoading] = useState(false);
   const [oracleStatus, setOracleStatus] = useState('pending'); // 'pending' (Active) or 'resolved' (Expired)
 
-  // Wallet Adapters integration
-  const { publicKey, select, disconnect, wallets } = useWallet();
-  const { connection } = useConnection();
-
-  const [walletBalance, setWalletBalance] = useState<string | null>(null);
-  const [showWalletSelector, setShowWalletSelector] = useState(false);
-
-  const walletAddress = publicKey ? publicKey.toBase58() : null;
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Custom hook for polling
+  // Custom hook for polling (keep for compatibility if needed elsewhere, but disabled)
   function useInterval(callback: () => void, delay: number | null) {
     const savedCallback = useRef(callback);
     useEffect(() => { savedCallback.current = callback; }, [callback]);
@@ -120,12 +110,47 @@ function App() {
     }, [delay]);
   }
 
-  // Poll for market updates every 30 seconds
+  // Wallet Adapters integration
+  const { publicKey, select, disconnect, wallets } = useWallet();
+  const { connection } = useConnection();
+
+  const [walletBalance, setWalletBalance] = useState<string | null>(null);
+  const [showWalletSelector, setShowWalletSelector] = useState(false);
+
+  const walletAddress = publicKey ? publicKey.toBase58() : null;
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // WebSocket listeners
+  useEffect(() => {
+    socket.on('connect', () => {
+      console.log('Connected to WebSocket server');
+    });
+
+    socket.on('market_update', (update: any) => {
+      console.log('Market update received:', update);
+      setMarkets(prev => prev.map(m => m.id === update.marketId ? { ...m, ...update.data } : m));
+    });
+
+    socket.on('price_update', (update: any) => {
+      console.log('Price update received:', update);
+      // Handle price updates (global or specific to views)
+    });
+
+    return () => {
+      socket.off('connect');
+      socket.off('market_update');
+      socket.off('price_update');
+    };
+  }, []);
+
+  // Poll for market updates - DISABLED for WebSockets
+  /*
   useInterval(() => {
     if (currentView === 'markets') fetchMarkets(pagination.page, search, category, source, sortBy);
     if (currentView === 'daily') fetchDailyData();
     if (currentView === 'oracle') fetchAIPredictions(oracleStatus);
   }, 30000);
+  */
 
   useEffect(() => {
     if (publicKey) {
@@ -437,26 +462,6 @@ function App() {
                       ))}
                     </select>
 
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="sort-dropdown glass-effect"
-                      style={{
-                        background: 'rgba(255,255,255,0.05)',
-                        color: 'white',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        padding: '0.4rem 1rem',
-                        borderRadius: '20px',
-                        marginLeft: '1rem',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="" disabled style={{ color: 'black' }}>Sort By...</option>
-                      <option value="trending" style={{ color: 'black' }}>🔥 Trending</option>
-                      <option value="volume" style={{ color: 'black' }}>High Volume</option>
-                      <option value="liquidity" style={{ color: 'black' }}>High Liquidity</option>
-                    </select>
                   </div>
                   <div className="source-selector">
                     <select

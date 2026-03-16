@@ -1,4 +1,4 @@
-﻿import { Connection, PublicKey, Context, KeyedAccountInfo, Commitment } from '@solana/web3.js';
+import { Connection, PublicKey, Context, KeyedAccountInfo, Commitment } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { SolanaService } from './solana.service';
 import { PrismaService } from '../../core/config/prisma.service';
@@ -223,6 +223,27 @@ export class SolanaListener {
           amount: uiAmount,
         },
       });
+
+      // Award XP for the prediction if it's new data (amount > 0 and wasn't previously awarded)
+      // Since SolanaListener is fire-and-forget, we check if we should award XP
+      // For simplicity in MVP, we award 20 XP for any significant position update if amount > 0
+      if (uiAmount > 0) {
+        await this.prisma.$transaction([
+          this.prisma.xPTransaction.create({
+            data: { 
+              walletAddress: owner, 
+              amount: 20, 
+              reason: 'prediction_detected', 
+              metadata: { market_id: market.id, mint } 
+            },
+          }),
+          this.prisma.user.update({
+            where: { walletAddress: owner },
+            data: { xpTotal: { increment: 20 } },
+          }),
+        ]);
+      }
+
       logger.debug(`Updated position for ${owner} in market ${market.id}: ${uiAmount} tokens`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown';
