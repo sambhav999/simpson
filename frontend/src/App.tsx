@@ -510,6 +510,12 @@ function App() {
                             alt={p.market.question} 
                             loading="lazy"
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (!target.src.includes('sig=')) { // Prevent infinite loops
+                                target.src = `https://source.unsplash.com/featured/800x600?cryptocurrency,abstract&sig=${p.id}`;
+                              }
+                            }}
                           />
                         </div>
                         <h3>{p.market.question}</h3>
@@ -624,6 +630,12 @@ function App() {
                             alt={m.title || m.question}
                             loading="lazy"
                             className="market-image-img"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (!target.src.includes('sig=')) {
+                                target.src = `https://source.unsplash.com/featured/800x600?abstract&sig=${m.id}`;
+                              }
+                            }}
                           />
                           <div className="source-tag">{m.source}</div>
                         </div>
