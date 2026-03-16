@@ -40,7 +40,7 @@ export class ExternalStreamsService {
           const feedId = msg.price_feed.id;
           const price = Number(msg.price_feed.price.price) * Math.pow(10, msg.price_feed.price.expo);
           
-          this.socketService.broadcast(SocketEvent.PRICE_UPDATE, {
+          this.socketService.emitToRoom(`feed:${feedId}`, SocketEvent.PRICE_UPDATE, {
             feedId,
             price,
             timestamp: new Date().toISOString(),
@@ -81,11 +81,14 @@ export class ExternalStreamsService {
         const msg = JSON.parse(data);
         // Map Polymarket events to our internal events
         if (msg.event === 'market_updated') {
-          this.socketService.broadcast(SocketEvent.MARKET_UPDATE, {
+          const payload = {
             source: 'polymarket',
             marketId: msg.data.id,
             data: msg.data,
-          });
+          };
+          // Emit to specific market room AND general markets room
+          this.socketService.emitToRoom(`market:${msg.data.id}`, SocketEvent.MARKET_UPDATE, payload);
+          this.socketService.broadcast(SocketEvent.MARKET_UPDATE, payload);
         }
       } catch (err) {
         logger.error('Error parsing Polymarket message', err);

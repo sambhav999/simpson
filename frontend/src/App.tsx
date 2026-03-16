@@ -13,6 +13,7 @@ const OracleView = lazy(() => import('./components/OracleView'));
 const DailyChallengesView = lazy(() => import('./components/DailyChallengesView'));
 const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
 const TradeModal = lazy(() => import('./components/TradeModal'));
+import SkeletonCard from './components/SkeletonCard';
 
 const API = import.meta.env.VITE_BACKEND_URL;
 const socket = io(API);
@@ -71,6 +72,13 @@ const SOURCES = [
   { key: 'kalshi', label: 'Kalshi', icon: '🏛️' },
   { key: 'sxbet', label: 'SX Bet', icon: '⚽' },
 ];
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'volume', label: 'Highest Volume' },
+  { value: 'liquidity', label: 'Highest Liquidity' },
+  { value: 'ending_soon', label: 'Ending Soon' },
+];
 
 function App() {
   const [markets, setMarkets] = useState<Market[]>([]);
@@ -80,7 +88,9 @@ function App() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [source, setSource] = useState('all');
-  const [sortBy, setSortBy] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loaderRef = useRef<HTMLDivElement>(null);
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle'>('markets');
   const [portfolioRefreshTrigger, setPortfolioRefreshTrigger] = useState(0);
@@ -143,6 +153,20 @@ function App() {
     };
   }, []);
 
+  // Room management for real-time updates
+  useEffect(() => {
+    if (selectedMarket) {
+      const room = `market:${selectedMarket.id}`;
+      socket.emit('join', room);
+      console.log(`Joined room: ${room}`);
+
+      return () => {
+        socket.emit('leave', room);
+        console.log(`Left room: ${room}`);
+      };
+    }
+  }, [selectedMarket]);
+
   // Poll for market updates - DISABLED for WebSockets
   /*
   useInterval(() => {
@@ -195,8 +219,9 @@ function App() {
 
   const truncateAddress = (addr: string) => `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 
-  const fetchMarkets = useCallback(async (page = 1, searchQuery = '', cat = 'All', src = 'all', sort = '') => {
-    setLoading(true);
+  const fetchMarkets = useCallback(async (page = 1, searchQuery = '', cat = 'All', src = 'all', sort = '', isAppend = false) => {
+    if (isAppend) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ page: String(page), limit: '20', status: 'active' });
@@ -208,13 +233,20 @@ function App() {
       const res = await fetch(`${API}/markets?${params}`);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const json = await res.json();
-      setMarkets(json.data || []);
+      
+      const newMarkets = json.data || [];
+      if (isAppend) {
+        setMarkets(prev => [...prev, ...newMarkets]);
+      } else {
+        setMarkets(newMarkets);
+      }
       setPagination(json.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch markets');
-      setMarkets([]);
+      if (!isAppend) setMarkets([]);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -281,6 +313,21 @@ function App() {
       fetchDailyData();
     }
   }, [currentView, category, source, sortBy, fetchMarkets, search, fetchDailyData, fetchAIPredictions, oracleStatus]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && !loading && !loadingMore && pagination.page < pagination.totalPages) {
+          fetchMarkets(pagination.page + 1, search, category, source, sortBy, true);
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (loaderRef.current) observer.observe(loaderRef.current);
+    return () => observer.disconnect();
+  }, [loading, loadingMore, pagination, fetchMarkets, search, category, source, sortBy]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -425,7 +472,14 @@ function App() {
                     {aiPredictions.slice(0, 3).map(p => (
                       <div key={p.id} className="featured-card glass-effect" onClick={() => handleMarketClick(p.market as any)}>
                         <div className="card-badge">HIGH CONFIDENCE {p.confidence}%</div>
-                        <div className="featured-card-image" style={{ backgroundImage: `url(${p.market.image || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80'})` }}></div>
+                        <div className="featured-card-image">
+                          <img 
+                            src={p.market.image || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80'} 
+                            alt={p.market.question} 
+                            loading="lazy"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
                         <h3>{p.market.question}</h3>
                         <div className="card-prediction">Baba Suggests: <span className={p.prediction}>{p.prediction}</span></div>
                         <p className="card-commentary">"{p.commentary.slice(0, 80)}..."</p>
@@ -486,13 +540,35 @@ function App() {
                       ))}
                     </select>
                   </div>
+                  <div className="sort-selector">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="sort-dropdown glass-effect"
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        padding: '0.4rem 1rem',
+                        borderRadius: '20px',
+                        marginLeft: '1rem',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {SORT_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value} style={{ color: 'black' }}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
               {loading && markets.length === 0 ? (
-                <div className="state-container">
-                  <div className="spinner" />
-                  <h3>Scanning the timeline...</h3>
+                <div className="markets-grid">
+                  {[...Array(8)].map((_, i) => <SkeletonCard key={i} />)}
                 </div>
               ) : error ? (
                 <div className="state-container">
@@ -510,7 +586,13 @@ function App() {
                   <div className="markets-grid">
                     {markets.map(m => (
                       <div key={m.id} className="market-card glass-effect" onClick={() => handleMarketClick(m)}>
-                        <div className="market-image" style={{ backgroundImage: `url(${m.image || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&auto=format&fit=crop&q=60'})` }}>
+                        <div className="market-image-container">
+                          <img 
+                            src={m.image || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&auto=format&fit=crop&q=60'} 
+                            alt={m.title || m.question}
+                            loading="lazy"
+                            className="market-image-img"
+                          />
                           <div className="source-tag">{m.source}</div>
                         </div>
                         <div className="market-card-content">
@@ -524,11 +606,13 @@ function App() {
                     ))}
                   </div>
 
-                  <div className="pagination">
-                    <button disabled={pagination.page <= 1} onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}>Previous</button>
-                    <span>Page {pagination.page} of {pagination.totalPages}</span>
-                    <button disabled={pagination.page >= pagination.totalPages} onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}>Next</button>
-                  </div>
+                  {loadingMore && (
+                    <div className="markets-grid" style={{ marginTop: '2rem' }}>
+                      {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+                    </div>
+                  )}
+
+                  <div ref={loaderRef} style={{ height: '20px', margin: '2rem 0' }}></div>
                 </>
               )}
             </main>

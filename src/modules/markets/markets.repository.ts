@@ -1,4 +1,4 @@
-﻿import { PrismaService } from '../../core/config/prisma.service';
+import { PrismaService } from '../../core/config/prisma.service';
 import { AggregatedMarket } from '../markets-aggregator/aggregator.service';
 import { logger } from '../../core/logger/logger';
 export interface MarketFilter {
@@ -100,20 +100,40 @@ export class MarketsRepository {
     const page = Math.max(1, pagination.page || 1);
     const limit = Math.min(100, Math.max(1, pagination.limit || 20));
     const skip = (page - 1) * limit;
-    const where: Record<string, unknown> = {};
-    if (status) where['status'] = status;
+    const where: Record<string, any> = {
+      status: 'active',
+      OR: [
+        { expiry: null },
+        { expiry: { gt: new Date() } }
+      ]
+    };
+    
     if (category) where['category'] = category;
     if (source) where['source'] = source;
     if (search) {
-      where['OR'] = [
+      const searchFilter = [
         { title: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
+      ];
+      // Combine with existing AND/OR if necessary, here we just intersect
+      where['AND'] = [
+        { OR: searchFilter }
       ];
     }
     let orderBy: any = { createdAt: 'desc' };
 
     if (filter.sort) {
       switch (filter.sort) {
+        case 'newest':
+          orderBy = { createdAt: 'desc' };
+          break;
+        case 'oldest':
+          orderBy = { createdAt: 'asc' };
+          break;
+        case 'ending_soon':
+          orderBy = { expiry: 'asc' };
+          // Note: Frontend should usually filter for status=active when using this
+          break;
         case 'volume':
           orderBy = { volume: 'desc' };
           break;

@@ -36,6 +36,16 @@ export class SocketService {
 
     this.io.on('connection', (socket) => {
       logger.info(`Client connected: ${socket.id}`);
+      
+      socket.on('join', (room: string) => {
+        socket.join(room);
+        logger.debug(`Client ${socket.id} joined room: ${room}`);
+      });
+
+      socket.on('leave', (room: string) => {
+        socket.leave(room);
+        logger.debug(`Client ${socket.id} left room: ${room}`);
+      });
 
       socket.on('disconnect', () => {
         logger.info(`Client disconnected: ${socket.id}`);
@@ -53,5 +63,15 @@ export class SocketService {
 
     this.io.emit(event, data);
     logger.debug(`Broadcasted event ${event}: ${JSON.stringify(data).slice(0, 100)}...`);
+  }
+
+  public emitToRoom(room: string, event: SocketEvent, data: any): void {
+    if (!this.io) {
+      logger.error('SocketService not initialized. Cannot emit to room.');
+      return;
+    }
+
+    this.io.to(room).emit(event, data);
+    logger.debug(`Emitted event ${event} to room ${room}: ${JSON.stringify(data).slice(0, 100)}...`);
   }
 }
