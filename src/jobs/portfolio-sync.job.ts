@@ -1,4 +1,4 @@
-﻿import { Queue, Worker, Job } from 'bullmq';
+import { Queue, Worker, Job } from 'bullmq';
 import { PortfolioService } from '../modules/portfolio/portfolio.service';
 import { PrismaService } from '../core/config/prisma.service';
 import { LeaderboardService } from '../modules/leaderboard/leaderboard.service';
@@ -19,7 +19,7 @@ export class PortfolioSyncJob {
     this.leaderboardService = new LeaderboardService();
     this.prisma = PrismaService.getInstance();
     const connection = RedisService.getBullMQConnection();
-    this.queue = new Queue(QUEUE_NAME, { connection });
+    this.queue = new Queue(QUEUE_NAME, { connection: connection as any });
     this.worker = new Worker(
       QUEUE_NAME,
       async (job: Job) => {
@@ -29,7 +29,7 @@ export class PortfolioSyncJob {
           await this.leaderboardService.updateLeaderboard();
         }
       },
-      { connection, concurrency: 5 }
+      { connection: connection as any, concurrency: 5 }
     );
     this.worker.on('completed', (job) => {
       logger.debug(`[PortfolioSyncJob] Job ${job.id} completed`);

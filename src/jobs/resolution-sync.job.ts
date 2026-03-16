@@ -16,7 +16,7 @@ export class ResolutionJob {
   constructor() {
     this.resolutionService = new ResolutionService();
     const connection = RedisService.getBullMQConnection();
-    this.queue = new Queue(QUEUE_NAME, { connection });
+    this.queue = new Queue(QUEUE_NAME, { connection: connection as any });
 
     this.worker = new Worker(
       QUEUE_NAME,
@@ -31,7 +31,7 @@ export class ResolutionJob {
           throw error;
         }
       },
-      { connection }
+      { connection: connection as any }
     );
   }
 

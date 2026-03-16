@@ -1,4 +1,4 @@
-﻿import { Queue, Worker, Job } from 'bullmq';
+import { Queue, Worker, Job } from 'bullmq';
 import { MarketsService } from '../modules/markets/markets.service';
 import { logger } from '../core/logger/logger';
 import { RedisService } from '../core/config/redis.service';
@@ -12,7 +12,7 @@ export class MarketSyncJob {
   constructor() {
     this.marketsService = new MarketsService();
     const connection = RedisService.getBullMQConnection();
-    this.queue = new Queue(QUEUE_NAME, { connection });
+    this.queue = new Queue(QUEUE_NAME, { connection: connection as any });
     this.worker = new Worker(
       QUEUE_NAME,
       async (job: Job) => {
@@ -26,7 +26,7 @@ export class MarketSyncJob {
           throw error;
         }
       },
-      { connection }
+      { connection: connection as any }
     );
     this.worker.on('completed', (job) => {
       logger.debug(`[MarketSyncJob] Job ${job.id} completed`);

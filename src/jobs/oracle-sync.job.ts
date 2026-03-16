@@ -24,7 +24,7 @@ export class OracleSyncJob {
         this.prisma = PrismaService.getInstance();
 
         const connection = RedisService.getBullMQConnection();
-        this.queue = new Queue(QUEUE_NAME, { connection });
+        this.queue = new Queue(QUEUE_NAME, { connection: connection as any });
 
         // Using Hermes public endpoint for Pyth
         this.hermesClient = new HermesClient('https://hermes.pyth.network');
@@ -39,7 +39,7 @@ export class OracleSyncJob {
                     throw error;
                 }
             },
-            { connection }
+            { connection: connection as any }
         );
     }
 

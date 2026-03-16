@@ -23,7 +23,7 @@ export class FeeReconciliationJob {
         this.alertService = new AlertService();
 
         const connection = RedisService.getBullMQConnection();
-        this.queue = new Queue(QUEUE_NAME, { connection });
+        this.queue = new Queue(QUEUE_NAME, { connection: connection as any });
 
         this.worker = new Worker(
             QUEUE_NAME,
@@ -38,7 +38,7 @@ export class FeeReconciliationJob {
                     throw error;
                 }
             },
-            { connection }
+            { connection: connection as any }
         );
 
         this.worker.on('failed', (job, err) => {

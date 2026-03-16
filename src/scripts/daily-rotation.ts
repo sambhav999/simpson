@@ -81,7 +81,7 @@ async function rotateAIOracle() {
         const bullText = templates.bull[Math.floor(Math.random() * templates.bull.length)];
         const bearText = templates.bear[Math.floor(Math.random() * templates.bear.length)];
 
-        await prisma.aIPrediction.create({
+        await (prisma.aIPrediction.create as any)({
             data: {
                 id: `ai-deb-${m.id}-${Date.now()}`,
                 marketId: m.id,
@@ -149,7 +149,7 @@ async function rotateDailyBattle() {
             status: 'active',
             markets: {
                 create: [
-                    ...marketsToCarryOver.map((bm, idx) => ({
+                    ...marketsToCarryOver.map((bm: any, idx) => ({
                         marketId: bm.marketId,
                         position: idx + 1,
                         homerPrediction: bm.homerPrediction,
