@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'simpredict-backend',
       script: 'dist/main.js',
-      instances: 'max',       // Spawn one worker per CPU core
+      instances: 2,           // Reduced for local testing to avoid Redis client limits
       exec_mode: 'cluster',   // Enable cluster mode
       max_memory_restart: '512M',
       env: {

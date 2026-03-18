@@ -505,12 +505,17 @@ function App() {
                       <div key={p.id} className="featured-card glass-effect" onClick={() => handleMarketClick(p.market as any)}>
                         <div className="card-badge">HIGH CONFIDENCE {p.confidence}%</div>
                         <div className="featured-card-image">
-                          <img 
-                            src={p.market.image || ''} 
-                            alt={p.market.question} 
-                            loading="lazy"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
+                          {p.market.image ? (
+                            <img 
+                              src={p.market.image} 
+                              alt={p.market.question} 
+                              loading="lazy"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('image-fallback'); }}
+                            />
+                          ) : (
+                            <div className="image-fallback" style={{ width: '100%', height: '100%' }} />
+                          )}
                         </div>
                         <h3>{p.market.question}</h3>
                         <div className="card-prediction">Baba Suggests: <span className={p.prediction}>{p.prediction}</span></div>
@@ -619,12 +624,17 @@ function App() {
                     {markets.map(m => (
                       <div key={m.id} className="market-card glass-effect" onClick={() => handleMarketClick(m)}>
                         <div className="market-image-container">
-                          <img 
-                            src={m.image || ''} 
-                            alt={m.title || m.question}
-                            loading="lazy"
-                            className="market-image-img"
-                          />
+                          {m.image ? (
+                            <img 
+                              src={m.image} 
+                              alt={m.title || m.question}
+                              loading="lazy"
+                              className="market-image-img"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('image-fallback'); }}
+                            />
+                          ) : (
+                            <div className="image-fallback" style={{ width: '100%', height: '100%' }} />
+                          )}
                           <div className="source-tag">{m.source}</div>
                         </div>
                         <div className="market-card-content">
