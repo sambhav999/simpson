@@ -234,26 +234,33 @@ Seven BullMQ workers run on configurable cron schedules:
 
 ## Deployment
 
-### Docker
+### 🚀 Zomro VPS (Production)
+
+The production backend is hosted at `http://188.137.230.72`.
+
+**Deployment Workflow:**
+1. **SSH**: Connect as root.
+2. **PM2**: `pm2 restart simpredict-backend --update-env`
+3. **Logs**: `pm2 logs simpredict-backend`
+
+### 🐳 Docker
 
 ```bash
 # Start all services (Redis + Backend + Migrations)
 docker compose up -d
 ```
 
-### Render.com
+### ☁️ Render.com
 
-The included `render.yaml` provides one-click deployment with:
-- Web service (Node.js, Frankfurt region)
-- Managed PostgreSQL database
-- Managed Redis instance
+The included `render.yaml` provides one-click deployment for cloud-native setups.
 
-### Production Build
+---
 
-```bash
-npm run build
-npm run start:render  # Runs migrations then starts server
-```
+## Production Optimization (2-Core)
+
+For servers with limited cores (2 vCPUs), keep these configurations:
+- **Sync Intervals**: Set `REPEAT_INTERVAL_MS` to `600_000` (10 min) in `market-sync.job.ts`.
+- **Deduplication**: Ensure background jobs only run on `NODE_APP_INSTANCE=0`.
 
 ---
 

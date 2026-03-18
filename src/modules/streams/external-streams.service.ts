@@ -62,36 +62,50 @@ export class ExternalStreamsService {
   }
 
   private connectToPolymarket(): void {
-    // Polymarket uses Gamma API for WebSocket updates
-    const endpoint = 'wss://gamma-api.polymarket.com/ws';
+    // Polymarket uses CLOB WebSocket for real-time updates
+    const endpoint = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
     this.polymarketWs = new WebSocket(endpoint);
 
+    let pingInterval: NodeJS.Timeout;
+
     this.polymarketWs.on('open', () => {
-      logger.info('Connected to Polymarket Gamma WebSocket');
-      // Subscribe to all market updates (or specific ones)
+      logger.info('Connected to Polymarket CLOB WebSocket');
+      
+      // Subscribe to simplified market updates
       const subscribeMsg = {
         type: 'subscribe',
-        topic: 'markets',
+        channels: ['markets'],
       };
       this.polymarketWs?.send(JSON.stringify(subscribeMsg));
+
+      // Start heartbeat to prevent timeout (every 20s)
+      pingInterval = setInterval(() => {
+        if (this.polymarketWs?.readyState === WebSocket.OPEN) {
+          this.polymarketWs.send('ping');
+        }
+      }, 20000);
     });
 
     this.polymarketWs.on('message', (data: string) => {
+      if (data.toString() === 'pong') return;
+
       try {
-        const msg = JSON.parse(data);
-        // Map Polymarket events to our internal events
-        if (msg.event === 'market_updated') {
+        const msg = JSON.parse(data.toString());
+        
+        // Handle CLOB events (e.g., price changes, market updates)
+        // The 'markets' channel sends events with specific types
+        if (msg.event_type === 'price_change' || msg.event_type === 'market_updated') {
           const payload = {
             source: 'polymarket',
-            marketId: msg.data.id,
-            data: msg.data,
+            marketId: msg.market_id || msg.data?.id,
+            data: msg,
           };
-          // Emit to specific market room AND global markets discovery room
-          this.socketService.emitToRoom(`market:${msg.data.id}`, SocketEvent.MARKET_UPDATE, payload);
+          
+          this.socketService.emitToRoom(`market:${payload.marketId}`, SocketEvent.MARKET_UPDATE, payload);
           this.socketService.emitToRoom('markets:all', SocketEvent.MARKET_UPDATE, payload);
         }
       } catch (err) {
-        logger.error('Error parsing Polymarket message', err);
+        // Silently skip non-JSON or heartbeat messages
       }
     });
 
@@ -100,6 +114,7 @@ export class ExternalStreamsService {
     });
 
     this.polymarketWs.on('close', () => {
+      clearInterval(pingInterval);
       logger.warn('Polymarket WebSocket closed. Reconnecting in 5s...');
       setTimeout(() => this.connectToPolymarket(), 5000);
     });

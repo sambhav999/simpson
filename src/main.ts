@@ -36,13 +36,19 @@ async function bootstrap() {
   const oracleSyncJob = new OracleSyncJob();
   const resolutionJob = new ResolutionJob();
   const solanaListener = new SolanaListener();
-  await marketSyncJob.start();
-  await portfolioSyncJob.start();
-  await feeReconciliationJob.start();
-  await oracleSyncJob.start();
-  await resolutionJob.start();
-  await solanaListener.start();
-  logger.info('Background jobs and listeners started');
+  const isInstance0 = process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE;
+
+  if (isInstance0) {
+    await marketSyncJob.start();
+    await portfolioSyncJob.start();
+    await feeReconciliationJob.start();
+    await oracleSyncJob.start();
+    await resolutionJob.start();
+    await solanaListener.start();
+    logger.info('Background jobs and listeners started (Instance 0)');
+  } else {
+    logger.info(`API Instance ${process.env.NODE_APP_INSTANCE} started (Jobs disabled)`);
+  }
   const port = config.PORT;
   server.listen(port, () => {
     logger.info(`SimPredict backend running on port ${port}`);
