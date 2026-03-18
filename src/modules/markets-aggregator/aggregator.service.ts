@@ -117,9 +117,8 @@ export class AggregatorService {
 
     async getMarkets(): Promise<AggregatedMarket[]> {
         try {
-            logger.debug('Fetching markets from Aggregator APIs (Limitless, Myriad, Polymarket)');
+            logger.debug('Fetching markets from Aggregator APIs');
 
-            // Example of parallel fetching:
             const [limitlessRes, polymarketRes, manifoldRes, hedgehogRes, kalshiRes, sxbetRes] = await Promise.allSettled([
                 this.fetchLimitlessMarkets(),
                 this.fetchPolymarketMarkets(),
@@ -129,52 +128,63 @@ export class AggregatorService {
                 this.fetchSXBetMarkets()
             ]);
 
-            const allMarkets: AggregatedMarket[] = [];
+            const allGroups = new Map<string, AggregatedMarket[]>();
 
-            if (limitlessRes.status === 'fulfilled') {
-                allMarkets.push(...limitlessRes.value.map(m => ({ ...m, source: 'limitless' as const })));
-            } else {
-                logger.error(`Failed to fetch short from Limitless: ${limitlessRes.reason}`);
+            const addResult = (res: PromiseSettledResult<AggregatedMarket[]>, source: string) => {
+                if (res.status === 'fulfilled') {
+                    for (const m of res.value) {
+                        const market = { ...m, source: source as any };
+                        const norm = this.normalizeTitle(market.title);
+                        if (!allGroups.has(norm)) allGroups.set(norm, []);
+                        allGroups.get(norm)!.push(market);
+                    }
+                } else {
+                    logger.error(`Failed to fetch from ${source}: ${res.reason}`);
+                }
+            };
+
+            addResult(limitlessRes, 'limitless');
+            addResult(polymarketRes, 'polymarket');
+            addResult(manifoldRes, 'manifold');
+            addResult(hedgehogRes, 'hedgehog');
+            addResult(kalshiRes, 'kalshi');
+            addResult(sxbetRes, 'sxbet');
+
+            const deDuplicated: AggregatedMarket[] = [];
+            let duplicateCount = 0;
+
+            for (const [_, markets] of allGroups) {
+                if (markets.length === 1) {
+                    deDuplicated.push(markets[0]);
+                } else {
+                    // Selection Strategy: Polymarket > Limitless > Kalshi > Others
+                    const sorted = markets.sort((a, b) => {
+                        const priority: Record<string, number> = { 'polymarket': 1, 'limitless': 2, 'kalshi': 3, 'manifold': 4, 'sxbet': 5, 'hedgehog': 6 };
+                        return (priority[a.source!] || 99) - (priority[b.source!] || 99);
+                    });
+                    deDuplicated.push(sorted[0]);
+                    duplicateCount += (markets.length - 1);
+                }
             }
 
-
-            if (polymarketRes.status === 'fulfilled') {
-                allMarkets.push(...polymarketRes.value.map(m => ({ ...m, source: 'polymarket' as const })));
-            } else {
-                logger.error(`Failed to fetch from Polymarket: ${polymarketRes.reason}`);
-            }
-
-            if (manifoldRes.status === 'fulfilled') {
-                allMarkets.push(...manifoldRes.value.map(m => ({ ...m, source: 'manifold' as const })));
-            } else {
-                logger.error(`Failed to fetch from Manifold: ${manifoldRes.reason}`);
-            }
-
-            if (hedgehogRes.status === 'fulfilled') {
-                allMarkets.push(...hedgehogRes.value.map(m => ({ ...m, source: 'hedgehog' as const })));
-            } else {
-                logger.error(`Failed to fetch from Hedgehog: ${hedgehogRes.reason}`);
-            }
-
-            if (kalshiRes.status === 'fulfilled') {
-                allMarkets.push(...kalshiRes.value.map(m => ({ ...m, source: 'kalshi' as const })));
-            } else {
-                logger.error(`Failed to fetch from Kalshi: ${kalshiRes.reason}`);
-            }
-
-            if (sxbetRes.status === 'fulfilled') {
-                allMarkets.push(...sxbetRes.value.map(m => ({ ...m, source: 'sxbet' as const })));
-            } else {
-                logger.error(`Failed to fetch from SXBet: ${sxbetRes.reason}`);
-            }
-
-            logger.info(`Fetched ${allMarkets.length} consolidated markets from aggregator sources`);
-            return allMarkets;
+            logger.info(`Fetched ${deDuplicated.length} unique markets (found and removed ${duplicateCount} duplicates)`);
+            return deDuplicated;
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             logger.error(`Failed to fetch markets from Aggregator: ${message}`);
             throw new AppError(`Aggregator markets fetch failed: ${message}`, 502);
         }
+    }
+
+    private normalizeTitle(title: string): string {
+        if (!title) return '';
+        return title
+            .toLowerCase()
+            .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "") // Remove punctuation
+            .replace(/\s{2,}/g, " ") // Remove double spaces
+            .replace(/^(will|is|can|are|was|does)\s+/g, "") // Remove leading question words
+            .replace(/\?$/g, "") // Remove trailing question mark
+            .trim();
     }
 
     /**
