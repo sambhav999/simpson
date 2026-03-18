@@ -16,7 +16,7 @@ const TradeModal = lazy(() => import('./components/TradeModal'));
 import SkeletonCard from './components/SkeletonCard';
 
 const API = import.meta.env.VITE_BACKEND_URL;
-const socket = io(API);
+const socket = io(API, { transports: ['websocket'] });
 
 declare global {
   interface Window {

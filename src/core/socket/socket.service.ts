@@ -30,6 +30,7 @@ export class SocketService {
     }
 
     this.io = new SocketIOServer(server, {
+      transports: ['websocket'],
       cors: {
         origin: '*', // In production, this should be restricted
         methods: ['GET', 'POST'],
