@@ -20,6 +20,9 @@ export class MarketSyncJob {
         try {
           const result = await this.marketsService.syncMarketsFromAggregator();
           logger.info(`[MarketSyncJob] Sync complete: ${JSON.stringify(result)}`);
+
+          // Warm cache after sync so common queries are always pre-populated
+          await this.marketsService.warmCache();
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown';
           logger.error(`[MarketSyncJob] Sync failed: ${message}`);

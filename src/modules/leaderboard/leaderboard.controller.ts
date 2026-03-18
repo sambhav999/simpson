@@ -1,4 +1,4 @@
-﻿import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { LeaderboardService } from './leaderboard.service';
 import { PrismaService } from '../../core/config/prisma.service';
 import { optionalAuth } from '../../core/config/auth.middleware';
@@ -79,14 +79,10 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
       }));
     }
 
-    // Find current user rank
+    // Find current user rank via Redis sorted set — O(log n) instead of full table scan
     let currentUserRank = null;
     if (req.user) {
-      const allUsers = await prisma.user.findMany({
-        orderBy: { xpTotal: 'desc' },
-        select: { walletAddress: true },
-      });
-      currentUserRank = allUsers.findIndex(u => u.walletAddress === req.user!.wallet) + 1;
+      currentUserRank = await leaderboardService.getUserXPRank(req.user.wallet);
     }
 
     res.json({

@@ -1,182 +1,292 @@
 # SimPredict
 
-A comprehensive, production-ready prediction marketplace built with React, Node.js, Express, Prisma, and Solana.
+**A non-custodial prediction marketplace powered by Solana, Pyth Network oracles, and DFlow.**
 
-This application acts as a real-time aggregator for top prediction markets (such as Polymarket and Limitless), providing users a premium UI to browse events, track their portfolio, view global leaderboards, and execute seamless trades via Solana Pay QR codes or direct browser wallet integration.
+SimPredict aggregates real-time odds from leading prediction platforms (Polymarket, Limitless Exchange), presents them through a premium glassmorphism UI, and enables seamless trading via Solana Pay QR codes or direct browser wallet integration.
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Node.js-20-339933?logo=node.js" alt="Node.js" />
+  <img src="https://img.shields.io/badge/TypeScript-5.4-3178C6?logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react" alt="React" />
+  <img src="https://img.shields.io/badge/Solana-Web3.js-9945FF?logo=solana" alt="Solana" />
+  <img src="https://img.shields.io/badge/Prisma-5.10-2D3748?logo=prisma" alt="Prisma" />
+  <img src="https://img.shields.io/badge/Redis-7-DC382D?logo=redis" alt="Redis" />
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker" alt="Docker" />
+</p>
 
 ---
 
-## 🆕 Recent Updates & Scale Optimization
+## Architecture
 
-- **Limitless Market Aggregation**: Successfully integrated the live Limitless API into the backend aggregator service (`AggregatorService`). Adapted the pagination and polling parameters (enforcing strict limits and dropping unsupported sorting flags) to align with endpoint constraints, mitigating generic `400 Bad Request` drop-offs.
-- **Dynamic Frontend Source Routing**: Overhauled the React frontend to feature a source-aware UI. Integrated a new interactive pill-based source switcher allowing users to filter prediction markets natively (`All`, `Limitless`, `Polymarket`), along with dynamic CSS-styled source badges directly rendered on market cards.
-- **Resilient BullMQ & Redis Connection Pooling**: Refactored the Node.js background processors (`market-sync`, `portfolio-sync`, `fee-reconciliation`, `oracle-sync`) to utilize a unified singleton `IORedis` connection factory. Configured `lazyConnect: true` and `maxRetriesPerRequest: null`, successfully eliminating recursive `ERR max number of clients reached` exhaustion bottlenecks on managed DigitalOcean Redis instances.
-- **Prisma Schema Fallbacks**: Resolved rigid PostgreSQL schema validation errors that caused silent drops during background job loops. Implemented robust data normalization with graceful string fallbacks ('N/A') for missing polymorphic aggregator properties (like `yesTokenMint`), successfully pushing 400+ Limitless markets through the `upsertMany` pipeline transaction.
-- **Manual Sync Webhook**: Appended a new RESTful `POST /markets/sync` controller endpoint enabling on-demand, manual force-triggers bridging the frontend and the multi-source aggregator jobs.
-- **Dynamic "Daily" Challenges & AI Oracle**: Transformed the static "Daily 5" feature into an auto-generating "Daily" challenge where the backend actively selects 10-20 random markets daily. Includes a legendary AI persona, "Homer Baba", competing directly against the community with pre-calculated accuracy ratings.
+This project is a **monorepo** consisting of:
 
----
-
-## Architecture Overview
-
-This project is a monorepo consisting of:
-1. **Frontend (`/frontend`)**: A React Single Page Application (SPA) styled with custom CSS and glassmorphism.
-2. **Backend (`/src`)**: A robust Node.js + Express API powered by Prisma (PostgreSQL) and Redis.
+| Layer | Stack | Description |
+|-------|-------|-------------|
+| **Frontend** (`/frontend`) | React 18 + Vite + Custom CSS | Glassmorphism SPA with real-time updates |
+| **Backend** (`/src`) | Node.js + Express + Prisma | REST API, WebSocket server, background workers |
+| **Database** | PostgreSQL (via Prisma ORM) | 16 models, optimized indexes |
+| **Cache & Queue** | Redis 7 (IORedis + BullMQ) | High-performance caching & job scheduling |
+| **Blockchain** | Solana (Web3.js + Solana Pay) | Non-custodial trade execution |
 
 ```
 simpredict-backend/
-├── frontend/                # React Vite Application
-│   ├── src/
-│   │   ├── App.tsx          # Main Views (Markets, Portfolio, Leaderboard)
-│   │   ├── main.tsx         # Entrypoint
-│   │   └── App.css          # Global Styles
-├── src/                     # Node.js REST API
-│   ├── core/
-│   │   └── config/          # Prisma & Redis singletons
-│   ├── modules/
-│   │   ├── markets-aggregator/ # Fetches from Polymarket, Limitless
-│   │   ├── markets/         # Market service and DB repository
-│   │   ├── portfolio/       # Wallet positions and trades
-│   │   ├── leaderboard/     # Global PnL and Streak rankings
-│   │   └── trade/           # Solana Pay QR generation and execution parsing
-│   ├── jobs/                # Background BullMQ workers (Market Sync)
-│   └── main.ts              # Express Server Setup
-├── prisma/
-│   └── schema.prisma        # Database Models (User, Market, Position, Trade...)
-└── .env                     # Configuration Secrets
+├── src/                         # Node.js REST API + Background Jobs
+│   ├── main.ts                  # Bootstrap & server lifecycle
+│   ├── app.ts                   # Express app (middleware + 16 route mounts)
+│   ├── core/                    # Prisma, Redis, Logger, Socket.IO singletons
+│   ├── modules/                 # 20 feature modules
+│   └── jobs/                    # 7 BullMQ background workers
+├── frontend/                    # React Vite SPA
+│   └── src/
+│       ├── pages/               # 7 pages (Landing, Markets, Daily, etc.)
+│       └── components/          # Reusable UI components
+├── prisma/schema.prisma         # Database schema (16 models)
+├── docker-compose.yml           # Redis + Backend + Migrations
+├── Dockerfile                   # Multi-stage production build
+└── render.yaml                  # Render.com IaC deployment
 ```
 
 ---
 
-## 🚀 Features
+## Features
 
-### Frontend (React UI)
-- **Markets View:** Browse dynamically synced prediction markets (Polymarket + Limitsless Mocks) with full-bleed premium cover images.
-- **The Daily:** Compete in auto-generated daily challenges (10-20 markets) against the AI Oracle. Unlock Bonus XP multipliers for perfect scores and beating the AI.
-- **AI Oracle 🔮:** A global scoreboard comparing the predictive accuracy of "Homer Baba" against the aggregated community predictions.
-- **Portfolio View:** Track active positions, overall PnL, Total Value, and recent trade history for connected wallets.
-- **Leaderboard View:** See top traders globally, sortable by Highest Streak and Total Volume. Connected user is dynamically highlighted!
-- **Solana Pay Integration:** Instantly generate dynamic Solana Pay QR Codes to seamlessly execute trades from a mobile phantom/solflare wallet!
-- **Browser Wallet Connect:** Connect Phantom or MetaMask natively to view tracked balances and history.
+### 🎯 Prediction Marketplace
+- **Multi-Source Aggregation** — Aggregates markets from Polymarket & Limitless Exchange in real-time
+- **Market Explorer** — Browse, filter, and search markets by category, source, volume, and status
+- **Market Detail** — Individual market pages with live odds, comments, AI predictions, and trade flow
+- **Featured Markets** — Curated market highlights
 
-### Backend (Node + Express)
-- **Aggregator Service:** Reaches out to leading API providers to extract, normalize, and cache current prediction events, including their thumbnails and categories!
-- **Auto-Generating Daily Battles:** Intelligent daily cron alternatives that dynamically assemble 10-20 random active markets for user competition.
-- **Solana Pay API:** `GET /trade/pay` and `POST /trade/pay` endpoints that implement the official Solana Pay specification to facilitate secure, gasless signing flows.
-- **High-Performance Caching:** Upstash Redis provides lightning-fast Leaderboard sorting and Market querying.
-- **Prisma ORM:** PostgreSQL schema mapping users, streaks, trade ledgers, predict-to-earn progress, and indexer states.
+### 🃏 Daily Challenges & AI Oracle
+- **Daily Battle** — Auto-generated daily challenges (10-20 random markets) for user competition
+- **Homer Baba 🔮** — AI Oracle that makes predictions with confidence scores and bullish/bearish commentary
+- **AI vs Community** — Global scoreboard comparing Homer's accuracy against aggregated community predictions
+- **XP Rewards** — Bonus multipliers for perfect scores and beating the AI
+
+### 💰 Solana Trading
+- **Solana Pay QR Codes** — Instant mobile trading via Phantom/Solflare wallets
+- **Browser Wallet Connect** — Native Phantom and wallet adapter support
+- **DFlow Routing** — MEV-protected order-flow auction execution
+- **On-Chain Indexing** — Real-time Solana transaction listener with checkpoint recovery
+
+### 📊 Portfolio & Leaderboards
+- **Portfolio Tracking** — Active positions, PnL, total value, and trade history per wallet
+- **Multi-Dimensional Leaderboards** — Rankings by PnL, volume, win rate, XP, accuracy, and creator referrals
+- **User Profiles** — Customizable profiles with avatars, bios, and stats
+
+### 🎮 Gamification
+- **XP System** — Experience points earned via trades, predictions, and daily challenges
+- **Points Currency** — Separate reward currency with full ledger tracking
+- **Streak Tracking** — Current and all-time highest trading streaks
+
+### 🌐 Social Features
+- **Threaded Comments** — Comment on markets with upvoting and replies
+- **Follow System** — Follow other users and track their activity
+- **Activity Feed** — Social feed aggregating content from followed users
+
+### 🎨 Creator Economy
+- **Host Markets** — Creators can host markets with custom captions and unique referral codes
+- **Attribution Tracking** — Click-through and conversion tracking for referral links
+- **Creator Leaderboard** — Rankings based on referral performance
+
+### 🃏 Meme Cards
+- **SVG-to-PNG Generation** — Shareable prediction cards rendered via Satori + Resvg
+- **Cloudflare R2 Storage** — Cards stored on S3-compatible edge storage
+- **Click Tracking** — Analytics on card shares and engagement
 
 ---
 
-## 🛠️ Environment Setup
+## Getting Started
 
-You need to define your environment variables in both the root `.env` (Backend) and the `frontend/.env` (Frontend).
+### Prerequisites
 
-### Backend Environment Variables (`/.env`)
+- **Node.js** ≥ 20
+- **PostgreSQL** instance (local or managed)
+- **Redis** instance (local or managed)
+- **Solana RPC** endpoint (e.g., [Helius](https://helius.dev))
+
+### 1. Install Dependencies
+
+```bash
+# Backend
+npm install
+
+# Frontend
+cd frontend && npm install && cd ..
+```
+
+### 2. Configure Environment
+
+Create `.env` in the project root:
 
 ```env
 # Database
-DATABASE_URL="postgresql://user:pass@host:5432/db"
+DATABASE_URL="postgresql://user:pass@host:5432/simpredict"
 
 # Redis
-REDIS_URL="redis://default:pass@host:port"
+REDIS_URL="redis://localhost:6379"
 
 # Solana
 HELIUS_RPC_URL="https://devnet.helius-rpc.com/?api-key=YOUR_KEY"
-SOLANA_NETWORK=devnet # or mainnet-beta
+SOLANA_NETWORK=devnet
 
 # Aggregator APIs
 LIMITLESS_API_URL="https://api.limitless.exchange"
-LIMITLESS_API_KEY="" # Optional
 POLYMARKET_API_URL="https://gamma-api.polymarket.com"
 
-# Server Configuration
+# Server
 PORT=3000
 NODE_ENV=development
 LOG_LEVEL=info
 
-# Authentication
+# Auth
 JWT_SECRET=your-secure-secret
 JWT_EXPIRY=24h
 
-# Cloudflare R2 (Meme Cards)
-R2_ENDPOINT=your-r2-endpoint
-R2_ACCESS_KEY_ID=your-access-key
-R2_SECRET_ACCESS_KEY=your-secret-key
-R2_BUCKET_NAME=simpredicts-cards
-
-# App Link
+# Frontend URL
 APP_URL=http://localhost:5173
 ```
 
-### Frontend Environment Variables (`/frontend/.env`)
+Create `frontend/.env`:
 
 ```env
 VITE_BACKEND_URL=http://localhost:3000
-VITE_POLYMARKET_API_URL=https://gamma-api.polymarket.com
 VITE_SOLANA_RPC_URL=https://devnet.helius-rpc.com/?api-key=YOUR_KEY
 ```
 
----
+### 3. Set Up Database
 
-## ⚙️ Running Locally
-
-### 1. Install Dependencies
-Install packages for both the backend and frontend:
-```bash
-# Root (Backend)
-npm install
-
-# Frontend
-cd frontend
-npm install
-cd ..
-```
-
-### 2. Prepare the Database (Backend)
-Push the Prisma Schema to your PostgreSQL instance:
 ```bash
 npx prisma db push
 npx prisma generate
 ```
 
-### 3. Sync Markets (Backend)
-Manually trigger the aggregator to populate your database with images and markets:
-```bash
-npx ts-node -e "import { MarketsService } from './src/modules/markets/markets.service'; async function run() { console.log('Syncing...'); const svc = new MarketsService(); await svc.syncMarketsFromAggregator(); process.exit(0); }; run();"
-```
+### 4. Start Development Servers
 
-### 4. Start the Application
-Run both the frontend and backend concurrently (in separate terminals):
-
-**Terminal 1 (Backend):**
+**Terminal 1 — Backend** (runs on `http://localhost:3000`):
 ```bash
 npm run start:dev
 ```
-*(Runs on `http://localhost:3000`)*
 
-**Terminal 2 (Frontend React App):**
+**Terminal 2 — Frontend** (runs on `http://localhost:5173`):
 ```bash
-cd frontend
-npm run dev
+cd frontend && npm run dev
 ```
-*(Runs on `http://localhost:5173`)*
+
+### 5. Seed Markets (Optional)
+
+Trigger a manual market sync to populate your database:
+```bash
+curl -X POST http://localhost:3000/markets/sync
+```
 
 ---
 
-## 📡 Core API Reference
+## API Overview
 
-### Markets & UI
-- `GET /markets`: Returns paginated lists of actively aggregated markets, formatted with `image`, `expiry`, and `category`.
-- `GET /portfolio/:wallet`: Returns the active PnL and Token Values tracking the provided Solana Wallet.
-- `GET /portfolio/:wallet/history`: Returns chronological trades.
-- `GET /leaderboard`: Returns top trader wallet addresses sorted by `totalVolume`, `streak`, or `totalPnl`.
+### Core Endpoints
 
-### Solana Pay (Trade)
-When a user clicks "Trade", the frontend queries the Solana Pay protocol:
-- **Phase 1** `GET /trade/pay?marketId=123&wallet=abc&side=YES&amount=10`
-  *Returns the required `label` and `icon` for the wallet UI.*
-- **Phase 2** `POST /trade/pay?marketId=123&wallet=abc&side=YES&amount=10`
-  *The mobile wallet posts the public key; the backend returns a serialized base64 Solana Transaction for the user to sign!*
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/markets` | List markets (paginated) |
+| `GET` | `/markets/featured` | Featured markets |
+| `GET` | `/markets/:id` | Market details |
+| `GET` | `/portfolio/:wallet` | Wallet portfolio |
+| `GET` | `/portfolio/:wallet/history` | Trade history |
+| `GET/POST` | `/trade/pay` | Solana Pay trade flow |
+| `GET` | `/leaderboard` | Global leaderboard |
+| `GET` | `/metrics` | Prometheus metrics |
+
+### V1 API (`/api/`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/auth/nonce` | Generate auth nonce |
+| `POST` | `/api/auth/verify` | Verify wallet signature |
+| `GET` | `/api/predictions/ai` | AI predictions |
+| `POST` | `/api/predictions/track` | Track prediction |
+| `GET/POST` | `/api/daily/*` | Daily battle system |
+| `POST` | `/api/creators/host` | Host a market |
+| `POST` | `/api/cards/generate` | Generate meme card |
+| `POST` | `/api/comments` | Create comment |
+| `POST` | `/api/follow` | Follow user |
+| `GET` | `/api/feed` | Activity feed |
+
+> For the full API reference with all 40+ endpoints, see [endpoints.md](./endpoints.md).
 
 ---
+
+## Background Jobs
+
+Seven BullMQ workers run on configurable cron schedules:
+
+| Job | Interval | Purpose |
+|-----|----------|---------|
+| Market Sync | 5 min | Aggregates markets from Polymarket & Limitless |
+| Portfolio Sync | 10 min | Refreshes wallet positions & PnL |
+| Oracle Sync | 2 min | Fetches Pyth Network price feeds |
+| Fee Reconciliation | 30 min | Reconciles protocol fee revenues |
+| Resolution Sync | 15 min | Checks market resolution status |
+| Leaderboard Update | 15 min | Recalculates global rankings |
+| Cleanup | Daily | Prunes expired data |
+
+---
+
+## Deployment
+
+### Docker
+
+```bash
+# Start all services (Redis + Backend + Migrations)
+docker compose up -d
+```
+
+### Render.com
+
+The included `render.yaml` provides one-click deployment with:
+- Web service (Node.js, Frankfurt region)
+- Managed PostgreSQL database
+- Managed Redis instance
+
+### Production Build
+
+```bash
+npm run build
+npm run start:render  # Runs migrations then starts server
+```
+
+---
+
+## Tech Stack
+
+| Category | Technologies |
+|----------|-------------|
+| **Backend** | Node.js, Express, TypeScript, Prisma, BullMQ |
+| **Frontend** | React 18, Vite, Custom CSS (Glassmorphism) |
+| **Database** | PostgreSQL, Redis (IORedis) |
+| **Blockchain** | Solana Web3.js, Solana Pay, Pyth Network, DFlow |
+| **Real-Time** | Socket.IO (with Redis adapter) |
+| **Image Gen** | Satori, Resvg, Cloudflare R2 |
+| **Monitoring** | Winston, Morgan, Prometheus (prom-client) |
+| **Security** | Helmet, CORS, Rate Limiting, JWT |
+| **DevOps** | Docker, Docker Compose, Render.com |
+
+---
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run start:dev` | Start backend with hot reload |
+| `npm run build` | Compile TypeScript |
+| `npm start` | Run production server |
+| `npm run start:render` | Migrate + start (for Render) |
+| `npm run lint` | ESLint fix |
+| `npx prisma studio` | Open Prisma database GUI |
+| `npx prisma db push` | Push schema to database |
+
+---
+
+## License
+
+This project is proprietary software. All rights reserved.

@@ -1,4 +1,4 @@
-﻿import { PrismaService } from '../../core/config/prisma.service';
+import { PrismaService } from '../../core/config/prisma.service';
 import { RedisService } from '../../core/config/redis.service';
 import { logger } from '../../core/logger/logger';
 export interface LeaderboardEntry {
@@ -10,6 +10,9 @@ export interface LeaderboardEntry {
   tradeCount: number;
   highestStreak: number;
 }
+
+const XP_SORTED_SET_KEY = 'leaderboard:xp:all_time';
+
 export class LeaderboardService {
   private readonly prisma: PrismaService;
   private readonly redis = RedisService.getInstance();
@@ -59,6 +62,50 @@ export class LeaderboardService {
     await this.redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(result));
     return result;
   }
+
+  /**
+   * Get a user's XP rank using Redis sorted set — O(log n) instead of full table scan.
+   * Returns 1-based rank or null if user not found in the set.
+   */
+  async getUserXPRank(walletAddress: string): Promise<number | null> {
+    try {
+      const rank = await this.redis.zrevrank(XP_SORTED_SET_KEY, walletAddress);
+      if (rank === null) return null;
+      return rank + 1; // Convert 0-based to 1-based
+    } catch (error) {
+      logger.warn(`Failed to get XP rank from Redis for ${walletAddress}, falling back`);
+      return null;
+    }
+  }
+
+  /**
+   * Sync all user XP values into a Redis sorted set for instant rank lookups.
+   * Called after leaderboard recalculation.
+   */
+  private async syncXPToRedis(): Promise<void> {
+    try {
+      const users = await this.prisma.user.findMany({
+        select: { walletAddress: true, xpTotal: true },
+        where: { xpTotal: { gt: 0 } },
+      });
+
+      if (users.length === 0) return;
+
+      // Pipeline for efficiency — batch all ZADD commands
+      const pipeline = this.redis.pipeline();
+      pipeline.del(XP_SORTED_SET_KEY);
+      for (const user of users) {
+        pipeline.zadd(XP_SORTED_SET_KEY, user.xpTotal, user.walletAddress);
+      }
+      await pipeline.exec();
+
+      logger.info(`Synced ${users.length} users' XP to Redis sorted set`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown';
+      logger.error(`Failed to sync XP to Redis: ${message}`);
+    }
+  }
+
   async updateLeaderboard(): Promise<void> {
     logger.info('Updating leaderboard...');
     try {
@@ -124,6 +171,10 @@ export class LeaderboardService {
 
       const keys = await this.redis.keys(`${this.CACHE_KEY}*`);
       if (keys.length > 0) await this.redis.del(...keys);
+
+      // Sync XP values to Redis sorted set for O(log n) rank lookups
+      await this.syncXPToRedis();
+
       logger.info(`Leaderboard updated for all periods.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown';

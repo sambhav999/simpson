@@ -5,7 +5,14 @@ export class PrismaService extends PrismaClient {
   private static instance: PrismaService;
 
   private constructor() {
+    // Increase connection pool from Prisma default (5) to 20
+    // and set pool timeout to 30s to prevent connection exhaustion under load
+    const dbUrl = process.env.DATABASE_URL || '';
+    const separator = dbUrl.includes('?') ? '&' : '?';
+    const pooledUrl = `${dbUrl}${separator}connection_limit=20&pool_timeout=30`;
+
     super({
+      datasourceUrl: pooledUrl,
       log: [
         { emit: 'event', level: 'query' },
         { emit: 'event', level: 'error' },
