@@ -8,20 +8,22 @@ const TIMEFRAMES = ['daily', 'weekly', 'monthly', 'all_time'] as const;
 
 export default function LeaderboardView({ walletAddress }: { walletAddress: string | null }) {
     const [metric, setMetric] = useState<typeof METRICS[number]>('XP Leaders');
-    const [timeframe, setTimeframe] = useState<typeof TIMEFRAMES[number]>('all_time');
+    const [timeframe, setTimeframe] = useState<typeof TIMEFRAMES[number]>('daily');
 
     const [data, setData] = useState<any[]>([]);
+    const [totalPlayers, setTotalPlayers] = useState(0);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         setLoading(true);
         let endpoint = `${API}/leaderboard/xp?timeframe=${timeframe}`;
-        if (metric === 'Accuracy Kings') endpoint = `${API}/leaderboard/accuracy?timeframe=${timeframe}&min_predictions=5`;
+        if (metric === 'Accuracy Kings') endpoint = `${API}/leaderboard/accuracy?timeframe=${timeframe}&min_predictions=0`;
 
         fetch(endpoint)
             .then(res => res.json())
             .then(json => {
                 setData(json.leaderboard || []);
+                setTotalPlayers(json.total_players || json.leaderboard?.length || 0);
                 setLoading(false);
             })
             .catch(() => setLoading(false));
@@ -38,7 +40,7 @@ export default function LeaderboardView({ walletAddress }: { walletAddress: stri
         <main className="main-content">
             <section className="hero">
                 <h1>Top Traders</h1>
-                <p>Leaderboard Rankings</p>
+                <p>{timeframe === 'daily' ? `${totalPlayers} Players Today` : 'Leaderboard Rankings'}</p>
             </section>
 
             {/* Filters */}
