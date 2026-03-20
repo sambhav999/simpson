@@ -1,4 +1,4 @@
-﻿import { PrismaService } from '../../core/config/prisma.service';
+import { PrismaService } from '../../core/config/prisma.service';
 import { SolanaService } from '../solana/solana.service';
 import { RedisService } from '../../core/config/redis.service';
 import { logger } from '../../core/logger/logger';
@@ -21,6 +21,10 @@ export interface PortfolioSummary {
   totalRealizedPnl: number;
   totalUnrealizedPnl: number;
   positions: PortfolioPosition[];
+  xpTotal: number;
+  accuracy: number;
+  totalWins: number;
+  totalResolved: number;
 }
 export class PortfolioService {
   private readonly prisma: PrismaService;
@@ -65,6 +69,18 @@ export class PortfolioService {
           unrealizedPnl,
         };
       });
+
+    // Fetch user XP and accuracy stats
+    const user = await this.prisma.user.findUnique({
+      where: { walletAddress },
+      select: { xpTotal: true },
+    });
+    const [wins, totalResolved] = await Promise.all([
+      this.prisma.position.count({ where: { walletAddress, status: 'WON' } }),
+      this.prisma.position.count({ where: { walletAddress, status: { in: ['WON', 'LOST'] } } }),
+    ]);
+    const accuracy = totalResolved > 0 ? wins / totalResolved : 0;
+
     const summary: PortfolioSummary = {
       walletAddress,
       totalPositions: portfolioPositions.length,
@@ -72,6 +88,10 @@ export class PortfolioService {
       totalRealizedPnl: portfolioPositions.reduce((acc, p) => acc + p.realizedPnl, 0),
       totalUnrealizedPnl: portfolioPositions.reduce((acc, p) => acc + p.unrealizedPnl, 0),
       positions: portfolioPositions,
+      xpTotal: user?.xpTotal || 0,
+      accuracy,
+      totalWins: wins,
+      totalResolved,
     };
     await this.redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(summary));
     return summary;
