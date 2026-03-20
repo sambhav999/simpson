@@ -112,10 +112,9 @@ export class MarketsRepository {
     if (source) where['source'] = source;
     if (search) {
       const searchFilter = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search } },
+        { description: { contains: search } },
       ];
-      // Combine with existing AND/OR if necessary, here we just intersect
       where['AND'] = [
         { OR: searchFilter }
       ];
