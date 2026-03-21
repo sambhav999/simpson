@@ -482,7 +482,7 @@ export class AggregatorService {
                 where: { source: 'kalshi', status: 'active' }
             });
             
-            const targetTotal = 30000;
+            const targetTotal = 35000;
             
             // 2. Determine how many new pages to fetch
             let maxPages = 1; // Always fetch at least 1 page (1000 markets) to catch updates/resolutions
