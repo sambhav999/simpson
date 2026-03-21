@@ -4,6 +4,7 @@ import axiosRetry from 'axios-retry';
 import { config } from '../../core/config/config';
 import { logger } from '../../core/logger/logger';
 import { AppError } from '../../core/config/error.handler';
+import { PrismaService } from '../../core/config/prisma.service';
 
 // Shape returned by the Limitless /markets/active endpoint
 interface LimitlessMarketResponse {
@@ -474,7 +475,25 @@ export class AggregatorService {
             let cursor: string | undefined = undefined;
             const limit = 1000; // Kalshi max per request
             let pageCount = 0;
-            const maxPages = 30; // Cap at ~30k markets
+            
+            // 1. Check how many active Kalshi markets we already have
+            const prisma = PrismaService.getInstance();
+            const currentCount = await prisma.market.count({
+                where: { source: 'kalshi', status: 'active' }
+            });
+            
+            const targetTotal = 30000;
+            
+            // 2. Determine how many new pages to fetch
+            let maxPages = 1; // Always fetch at least 1 page (1000 markets) to catch updates/resolutions
+            
+            if (currentCount < targetTotal) {
+                // We have room for more — fetch the difference (up to limit)
+                const deficit = targetTotal - currentCount;
+                maxPages = Math.ceil(deficit / limit);
+            }
+            
+            logger.info(`Kalshi: currently have ${currentCount}/${targetTotal} markets. Fetching up to ${maxPages} pages (${maxPages * limit} markets).`);
 
             while (pageCount < maxPages) {
                 const params: Record<string, any> = { limit, status: 'open' };
