@@ -470,32 +470,54 @@ export class AggregatorService {
 
     private async fetchKalshiMarkets(): Promise<AggregatedMarket[]> {
         try {
-            const response = await this.kalshiClient.get('/markets', {
-                params: { limit: 100, status: 'open' }
-            });
+            const parsedMarkets: AggregatedMarket[] = [];
+            let cursor: string | undefined = undefined;
+            const limit = 1000; // Kalshi max per request
+            let pageCount = 0;
+            const maxPages = 200; // Safety cap (~200k markets max)
 
-            const markets = response.data?.markets;
-            if (!Array.isArray(markets)) return [];
+            while (pageCount < maxPages) {
+                const params: Record<string, any> = { limit, status: 'open' };
+                if (cursor) params.cursor = cursor;
 
-            return markets.map((m: any): AggregatedMarket => ({
-                id: `KAL-${m.ticker}`,
-                title: m.title || m.ticker || 'Unknown Kalshi Market',
-                description: m.subtitle || '',
-                yesTokenMint: `KAL_YES_${m.ticker}`,
-                noTokenMint: `KAL_NO_${m.ticker}`,
-                expiry: m.close_time ? new Date(m.close_time).toISOString() : null,
-                status: 'active',
-                category: m.category || 'Kalshi',
-                image: m.image_url || undefined,
-                volume: m.volume ? String(m.volume) : undefined,
-                liquidity: m.liquidity ? String(m.liquidity) : undefined,
-                prices: [
-                    (m.yes_bid !== undefined && m.yes_bid !== null) ? (m.yes_bid / 100) : 0.5,
-                    (m.no_bid !== undefined && m.no_bid !== null) ? (m.no_bid / 100) : 0.5
-                ],
-                source: 'kalshi',
-                slug: m.mutually_exclusive_group_id || undefined
-            }));
+                const response = await this.kalshiClient.get('/markets', { params });
+
+                const markets = response.data?.markets;
+                if (!Array.isArray(markets) || markets.length === 0) break;
+
+                for (const m of markets) {
+                    parsedMarkets.push({
+                        id: `KAL-${m.ticker}`,
+                        title: m.title || m.ticker || 'Unknown Kalshi Market',
+                        description: m.subtitle || '',
+                        yesTokenMint: `KAL_YES_${m.ticker}`,
+                        noTokenMint: `KAL_NO_${m.ticker}`,
+                        expiry: m.close_time ? new Date(m.close_time).toISOString() : null,
+                        status: 'active',
+                        category: m.category || 'Kalshi',
+                        image: m.image_url || undefined,
+                        volume: m.volume ? String(m.volume) : undefined,
+                        liquidity: m.liquidity ? String(m.liquidity) : undefined,
+                        prices: [
+                            (m.yes_bid !== undefined && m.yes_bid !== null) ? (m.yes_bid / 100) : 0.5,
+                            (m.no_bid !== undefined && m.no_bid !== null) ? (m.no_bid / 100) : 0.5
+                        ],
+                        source: 'kalshi',
+                        slug: m.mutually_exclusive_group_id || undefined
+                    });
+                }
+
+                pageCount++;
+                cursor = response.data?.cursor;
+
+                // If no cursor returned or empty, we've reached the end
+                if (!cursor) break;
+
+                logger.debug(`Kalshi: fetched page ${pageCount}, got ${markets.length} markets (total so far: ${parsedMarkets.length})`);
+            }
+
+            logger.info(`Kalshi: fetched ${parsedMarkets.length} active markets total across ${pageCount} pages`);
+            return parsedMarkets;
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unknown error';
             logger.warn(`Kalshi API unreachable (${message}). Using fallback markets.`);
