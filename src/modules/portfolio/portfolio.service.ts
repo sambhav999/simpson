@@ -98,11 +98,79 @@ export class PortfolioService {
   }
   async getTradeHistory(
     walletAddress: string,
-    options: { page?: number; limit?: number; marketId?: string } = {}
+    options: { page?: number; limit?: number; marketId?: string; days?: number } = {}
   ) {
     if (!this.solana.validatePublicKey(walletAddress)) {
       throw new AppError('Invalid wallet address', 400);
     }
+    
+    // If fetching by days for unified activity feed
+    if (options.days) {
+      const targetDate = new Date(Date.now() - options.days * 24 * 60 * 60 * 1000);
+      
+      const [trades, xpTxs, pointsTxs] = await Promise.all([
+        this.prisma.trade.findMany({
+          where: { walletAddress, timestamp: { gte: targetDate } },
+          orderBy: { timestamp: 'desc' },
+          take: 150, // safety limit
+          include: { market: { select: { title: true, yesTokenMint: true, noTokenMint: true, image: true, category: true } } },
+        }),
+        this.prisma.xPTransaction.findMany({
+          where: { walletAddress, createdAt: { gte: targetDate } },
+          orderBy: { createdAt: 'desc' },
+          take: 150,
+        }),
+        this.prisma.pointsLedger.findMany({
+          where: { walletAddress, createdAt: { gte: targetDate } },
+          orderBy: { createdAt: 'desc' },
+          take: 150,
+        })
+      ]);
+      
+      const activities: any[] = [];
+      
+      trades.forEach(t => {
+        activities.push({
+          type: 'TRADE',
+          id: t.id,
+          marketTitle: t.market.title,
+          marketImage: (t.market as any).image,
+          tokenSide: t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO',
+          amount: t.amount,
+          price: t.price,
+          signature: t.signature,
+          timestamp: t.timestamp
+        });
+      });
+      
+      xpTxs.forEach(x => {
+        activities.push({
+          type: 'XP',
+          id: x.id,
+          amount: x.amount,
+          reason: x.reason,
+          timestamp: x.createdAt
+        });
+      });
+      
+      pointsTxs.forEach(p => {
+        activities.push({
+          type: 'POINTS',
+          id: p.id,
+          amount: p.amount,
+          reason: p.reason,
+          timestamp: p.createdAt
+        });
+      });
+      
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      return {
+        data: activities,
+        pagination: { page: 1, limit: activities.length, total: activities.length, totalPages: 1 }
+      };
+    }
+
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
@@ -121,6 +189,7 @@ export class PortfolioService {
     return {
       data: trades.map((t) => ({
         ...t,
+        type: 'TRADE',
         marketTitle: t.market.title,
         marketImage: (t.market as any).image,
         marketCategory: (t.market as any).category,

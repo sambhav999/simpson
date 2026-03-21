@@ -1,4 +1,4 @@
-﻿import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { PortfolioService } from './portfolio.service';
 import { AppError } from '../../core/config/error.handler';
 export const portfolioRouter = Router();
@@ -16,12 +16,13 @@ portfolioRouter.get('/:wallet', async (req: Request, res: Response, next: NextFu
 portfolioRouter.get('/:wallet/history', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { wallet } = req.params;
-    const { page, limit, marketId } = req.query;
+    const { page, limit, marketId, days } = req.query;
     if (!wallet) return next(new AppError('Wallet address is required', 400));
     const history = await portfolioService.getTradeHistory(wallet, {
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       marketId: marketId as string | undefined,
+      days: days ? Number(days) : undefined,
     });
     res.json(history);
   } catch (error) {

@@ -14,7 +14,7 @@ export default function PortfolioView({ walletAddress, onConnectWallet, refreshT
             try {
                 const [portRes, histRes] = await Promise.all([
                     fetch(`${API}/portfolio/${walletAddress}`),
-                    fetch(`${API}/portfolio/${walletAddress}/history?limit=10`)
+                    fetch(`${API}/portfolio/${walletAddress}/history?days=10`)
                 ]);
                 if (portRes.ok) setData((await portRes.json()).data);
                 if (histRes.ok) setHistory((await histRes.json()).data || []);
@@ -88,62 +88,61 @@ export default function PortfolioView({ walletAddress, onConnectWallet, refreshT
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 {history.map((h, i) => (
                                     <div key={i} className="stat-card activity-card" style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'auto 1fr auto',
-                                        gap: '1.5rem',
-                                        alignItems: 'center',
-                                        padding: '1.25rem'
+                                        display: 'grid', gridTemplateColumns: 'auto 1fr auto',
+                                        gap: '1.5rem', alignItems: 'center', padding: '1.25rem'
                                     }}>
                                         <div className="activity-market-image" style={{
-                                            width: '48px',
-                                            height: '48px',
-                                            borderRadius: '8px',
-                                            backgroundColor: 'rgba(255,255,255,0.05)',
-                                            overflow: 'hidden',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
+                                            width: '48px', height: '48px', borderRadius: '8px',
+                                            backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: '1.5rem'
                                         }}>
-                                            {h.marketImage ? (
+                                            {h.type === 'TRADE' && h.marketImage ? (
                                                 <img src={h.marketImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                            ) : (
-                                                <span style={{ fontSize: '1.5rem' }}>📊</span>
-                                            )}
+                                            ) : h.type === 'XP' ? '⚡' : h.type === 'POINTS' ? '🪙' : '📊'}
                                         </div>
 
                                         <div className="activity-info" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                             <div style={{ fontWeight: '600', fontSize: '1rem', color: 'var(--text-main)', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                                {h.marketTitle || 'Unknown Market'}
+                                                {h.type === 'TRADE' ? (h.marketTitle || 'Unknown Market') : h.reason}
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.85rem', color: 'var(--text-dim)' }}>
-                                                <span className={`side-badge ${h.tokenSide?.toLowerCase()}`} style={{
-                                                    padding: '2px 8px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 'bold',
-                                                    backgroundColor: h.tokenSide === 'YES' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                                                    color: h.tokenSide === 'YES' ? '#4ade80' : '#f87171'
-                                                }}>
-                                                    {h.tokenSide}
-                                                </span>
-                                                <span>{h.amount ? `$${Number(h.amount).toFixed(2)}` : '$0.00'} @ ${Number(h.price || 0).toFixed(3)}</span>
-                                                <span style={{ opacity: 0.5 }}>•</span>
-                                                <span>{new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                {h.type === 'TRADE' && (
+                                                    <>
+                                                        <span className={`side-badge ${h.tokenSide?.toLowerCase()}`} style={{
+                                                            padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold',
+                                                            backgroundColor: h.tokenSide === 'YES' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                                            color: h.tokenSide === 'YES' ? '#4ade80' : '#f87171'
+                                                        }}>
+                                                            {h.tokenSide}
+                                                        </span>
+                                                        <span>{h.amount ? `$${Number(h.amount).toFixed(2)}` : '$0.00'} @ ${Number(h.price || 0).toFixed(3)}</span>
+                                                        <span style={{ opacity: 0.5 }}>•</span>
+                                                    </>
+                                                )}
+                                                <span>{
+                                                    new Date(h.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+                                                    + ', ' + 
+                                                    new Date(h.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                                                }</span>
                                             </div>
                                         </div>
 
                                         <div className="activity-meta" style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                            <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
-                                                {h.signature?.startsWith('sim_') ? 'Simulation' : 'On-chain'}
-                                            </div>
-                                            <a
-                                                href={`https://solscan.io/tx/${h.signature}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                style={{ fontSize: '0.75rem', color: 'var(--accent-blue)', textDecoration: 'none' }}
-                                            >
-                                                {h.signature?.substring(0, 8)}...
-                                            </a>
+                                            {h.type === 'TRADE' ? (
+                                                <>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
+                                                        {h.signature?.startsWith('sim_') ? 'Simulation' : 'On-chain'}
+                                                    </div>
+                                                    <a href={`https://solscan.io/tx/${h.signature}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', color: 'var(--accent-blue)', textDecoration: 'none' }}>
+                                                        {h.signature?.substring(0, 8)}...
+                                                    </a>
+                                                </>
+                                            ) : (
+                                                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: h.type === 'XP' ? '#a78bfa' : '#fbbf24' }}>
+                                                    +{h.amount} {h.type === 'XP' ? 'XP' : 'Pts'}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
