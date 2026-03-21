@@ -474,7 +474,7 @@ export class AggregatorService {
             let cursor: string | undefined = undefined;
             const limit = 1000; // Kalshi max per request
             let pageCount = 0;
-            const maxPages = 200; // Safety cap (~200k markets max)
+            const maxPages = 30; // Cap at ~30k markets
 
             while (pageCount < maxPages) {
                 const params: Record<string, any> = { limit, status: 'open' };
