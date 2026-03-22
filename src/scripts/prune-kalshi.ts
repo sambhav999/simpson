@@ -7,7 +7,7 @@ async function main() {
     
     // Check how many we have
     const kalshiCount = await prisma.market.count({
-        where: { source: 'kalshi' }
+        where: { source: 'kalshi', status: 'active' }
     });
     
     console.log(`Current Kalshi market count: ${kalshiCount}`);
@@ -24,7 +24,7 @@ async function main() {
     
     // Find the oldest excess markets by ID
     const oldestMarkets = await prisma.market.findMany({
-        where: { source: 'kalshi' },
+        where: { source: 'kalshi', status: 'active' },
         orderBy: { createdAt: 'asc' },
         select: { id: true },
         take: excess
@@ -50,9 +50,9 @@ async function main() {
     console.log(`✅ Successfully pruned ${deletedCount} Kalshi markets.`);
     
     const newCount = await prisma.market.count({
-        where: { source: 'kalshi' }
+        where: { source: 'kalshi', status: 'active' }
     });
-    console.log(`New Kalshi market count: ${newCount}`);
+    console.log(`New active Kalshi market count: ${newCount}`);
 }
 
 main()
