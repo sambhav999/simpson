@@ -485,39 +485,42 @@ export class AggregatorService {
             const targetTotal = 35000;
             
             // 2. Determine how many new pages to fetch
-            let maxPages = 1; // Always fetch at least 1 page (1000 markets) to catch updates/resolutions
+            let maxPages = 0; // Default to 0: do not fetch new markets unless under the limit
             
             if (currentCount < targetTotal) {
                 // We have room for more — fetch the difference (up to limit)
                 const deficit = targetTotal - currentCount;
                 maxPages = Math.ceil(deficit / limit);
-            } else if (currentCount > targetTotal) {
-                // We have excess Kalshi markets in the DB, let's proactively prune them.
-                const excess = currentCount - targetTotal;
-                logger.info(`Kalshi DB limit exceeded: found ${currentCount} markets > ${targetTotal} limit. Proactively pruning ${excess} oldest inactive/resolved markets...`);
+            } else {
+                logger.info(`Kalshi: Active DB count is ${currentCount} (>= ${targetTotal}). Skipping fetch completely until old markets expire.`);
                 
-                try {
-                    // Try to delete oldest inactive markets first
-                    const oldestToPrune = await prisma.market.findMany({
-                        where: { source: 'kalshi' },
-                        orderBy: { createdAt: 'asc' },
-                        select: { id: true },
-                        take: excess
-                    });
+                if (currentCount > targetTotal) {
+                    // We have excess Kalshi markets in the DB, let's proactively prune them.
+                    const excess = currentCount - targetTotal;
+                    logger.info(`Kalshi active limit exceeded by ${excess}. Proactively pruning oldest active markets to enforce limit...`);
                     
-                    if (oldestToPrune.length > 0) {
-                        const marketIdsToDelete = oldestToPrune.map(m => m.id);
-                        await prisma.market.deleteMany({
-                            where: { id: { in: marketIdsToDelete } }
+                    try {
+                        const oldestToPrune = await prisma.market.findMany({
+                            where: { source: 'kalshi', status: 'active' },
+                            orderBy: { createdAt: 'asc' },
+                            select: { id: true },
+                            take: excess
                         });
-                        logger.info(`Successfully pruned ${marketIdsToDelete.length} excess Kalshi markets.`);
+                        
+                        if (oldestToPrune.length > 0) {
+                            const marketIdsToDelete = oldestToPrune.map(m => m.id);
+                            await prisma.market.deleteMany({
+                                where: { id: { in: marketIdsToDelete } }
+                            });
+                            logger.info(`Successfully pruned ${marketIdsToDelete.length} excess Kalshi markets.`);
+                        }
+                    } catch (pruneErr) {
+                        logger.warn(`Failed to prune excess Kalshi markets: ${pruneErr instanceof Error ? pruneErr.message : 'Unknown'}`);
                     }
-                } catch (pruneErr) {
-                    logger.warn(`Failed to prune excess Kalshi markets: ${pruneErr instanceof Error ? pruneErr.message : 'Unknown'}`);
                 }
             }
             
-            logger.info(`Kalshi: currently have ${currentCount}/${targetTotal} markets. Fetching up to ${maxPages} pages (${maxPages * limit} markets).`);
+            logger.info(`Kalshi: currently have ${currentCount}/${targetTotal} active markets. Fetching up to ${maxPages} pages (${maxPages * limit} markets).`);
 
             while (pageCount < maxPages) {
                 const params: Record<string, any> = { limit, status: 'open' };
