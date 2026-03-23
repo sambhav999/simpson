@@ -113,7 +113,7 @@ export class PortfolioService {
           where: { walletAddress, timestamp: { gte: targetDate } },
           orderBy: { timestamp: 'desc' },
           take: 150, // safety limit
-          include: { market: { select: { title: true, yesTokenMint: true, noTokenMint: true, image: true, category: true } } },
+          include: { market: { select: { title: true, yesTokenMint: true, noTokenMint: true, image: true, category: true, resolved: true, resolution: true } } },
         }),
         this.prisma.xPTransaction.findMany({
           where: { walletAddress, createdAt: { gte: targetDate } },
@@ -130,6 +130,12 @@ export class PortfolioService {
       const activities: any[] = [];
       
       trades.forEach(t => {
+        let result = 'PENDING';
+        if (t.market.resolved) {
+          const side = t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO';
+          result = t.market.resolution === side ? 'WIN' : 'LOSS';
+        }
+
         activities.push({
           type: 'TRADE',
           id: t.id,
@@ -139,7 +145,9 @@ export class PortfolioService {
           amount: t.amount,
           price: t.price,
           signature: t.signature,
-          timestamp: t.timestamp
+          timestamp: t.timestamp,
+          resolved: t.market.resolved,
+          result: result
         });
       });
       

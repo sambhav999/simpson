@@ -71,9 +71,13 @@ export default function DailyChallengesView({
     };
 
     const renderChallengeCard = (m: any, idx: number | null, isExpired = false) => {
-        const isLocked = !!m.user_prediction;
-        const myPick = isLocked ? m.user_prediction : userPredictions[m.id];
+        const hasPrediction = !!m.user_prediction;
+        const myPick = hasPrediction 
+            ? (typeof m.user_prediction === 'object' ? m.user_prediction.prediction : m.user_prediction) 
+            : userPredictions[m.id];
         
+        const myResult = hasPrediction && typeof m.user_prediction === 'object' ? m.user_prediction.result : null;
+
         return (
             <div key={m.id} className={`daily-card ${isExpired ? 'glass-effect' : 'aura-border'}`} style={{ display: 'flex', gap: '2rem', marginBottom: '1rem', alignItems: 'center', opacity: isExpired ? 0.7 : 1 }}>
                 <div 
@@ -84,13 +88,29 @@ export default function DailyChallengesView({
                     }}
                 ></div>
                 <div style={{ flex: 1 }}>
-                    <h4 style={{ color: isExpired ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                        {idx !== null ? `${idx + 1}. ` : ''}{m.market.question}
-                    </h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <h4 style={{ color: isExpired ? 'var(--text-muted)' : 'var(--text-primary)', margin: 0 }}>
+                            {idx !== null ? `${idx + 1}. ` : ''}{m.market.question}
+                        </h4>
+                        {myResult && myResult !== 'PENDING' && (
+                            <span style={{ 
+                                padding: '4px 12px', 
+                                borderRadius: '20px', 
+                                fontSize: '0.75rem', 
+                                fontWeight: '900',
+                                backgroundColor: myResult === 'WIN' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                color: myResult === 'WIN' ? '#4ade80' : '#f87171',
+                                border: `1px solid ${myResult === 'WIN' ? '#4ade80' : '#f87171'}`,
+                                marginLeft: '1rem'
+                            }}>
+                                {myResult === 'WIN' ? 'YOU WON' : 'YOU LOST'}
+                            </span>
+                        )}
+                    </div>
                     <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                         <div style={{ flex: 1, padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
                             <div style={{ color: isExpired ? 'var(--text-muted)' : 'var(--accent-purple)', fontSize: '0.7rem' }}>
-                                {isExpired ? 'RESULT' : "HOMER'S PICK"}
+                                {isExpired ? 'MARKET RESULT' : "HOMER'S PICK"}
                             </div>
                             <div style={{ fontWeight: 'bold' }}>
                                 {m.homer_prediction} ({m.homer_confidence}%)
@@ -99,8 +119,8 @@ export default function DailyChallengesView({
                             <p style={{ fontStyle: 'italic', fontSize: '0.8rem', marginBottom: '0.8rem' }}>"{m.homer_commentary || 'Homer Baba detects strong currents...'}"</p>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '100px' }}>
-                            <button className={`dm-btn yes-btn ${myPick === 'YES' ? 'selected' : ''}`} disabled={isLocked || isExpired} onClick={() => handlePrediction(m.id, 'YES')}>YES</button>
-                            <button className={`dm-btn no-btn ${myPick === 'NO' ? 'selected' : ''}`} disabled={isLocked || isExpired} onClick={() => handlePrediction(m.id, 'NO')}>NO</button>
+                            <button className={`dm-btn yes-btn ${myPick === 'YES' ? 'selected' : ''}`} disabled={hasPrediction || isExpired} onClick={() => handlePrediction(m.id, 'YES')}>YES</button>
+                            <button className={`dm-btn no-btn ${myPick === 'NO' ? 'selected' : ''}`} disabled={hasPrediction || isExpired} onClick={() => handlePrediction(m.id, 'NO')}>NO</button>
                         </div>
                     </div>
                 </div>

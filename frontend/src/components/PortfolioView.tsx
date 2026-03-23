@@ -131,7 +131,16 @@ export default function PortfolioView({ walletAddress, onConnectWallet, refreshT
                                         <div className="activity-meta" style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                             {h.type === 'TRADE' ? (
                                                 <>
-                                                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                                        {h.result && h.result !== 'PENDING' && (
+                                                            <span style={{ 
+                                                                color: h.result === 'WIN' ? '#4ade80' : '#f87171',
+                                                                fontSize: '0.7rem',
+                                                                fontWeight: '900'
+                                                            }}>
+                                                                {h.result}
+                                                            </span>
+                                                        )}
                                                         {h.signature?.startsWith('sim_') ? 'Simulation' : 'On-chain'}
                                                     </div>
                                                     <a href={`https://solscan.io/tx/${h.signature}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', color: 'var(--accent-blue)', textDecoration: 'none' }}>

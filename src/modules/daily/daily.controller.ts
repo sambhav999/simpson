@@ -51,7 +51,10 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
                 where: { userId: req.user.wallet },
             });
         }
-        const userPredMap = new Map(userPredictions.map(p => [p.dailyBattleMarketId, p.prediction]));
+        const userPredMap = new Map(userPredictions.map(p => [
+            p.dailyBattleMarketId, 
+            { prediction: p.prediction, result: p.result }
+        ]));
 
         // 1. Today's Challenges
         const todays = latestBattle.markets.map(m => ({
