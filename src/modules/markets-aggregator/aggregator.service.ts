@@ -476,33 +476,52 @@ export class AggregatorService {
             const limit = 1000; // Kalshi max per request
             let pageCount = 0;
             
-            // 1. Check how many active Kalshi markets we already have
+            const targetTotal = 35000;
             const prisma = PrismaService.getInstance();
+            const now = new Date();
+
+            // 1. Mark expired markets as 'expired' before counting active ones
+            try {
+                const expiredResult = await prisma.market.updateMany({
+                    where: {
+                        source: 'kalshi',
+                        status: 'active',
+                        expiry: { lt: now }
+                    },
+                    data: { status: 'expired' }
+                });
+                if (expiredResult.count > 0) {
+                    logger.info(`Kalshi: Automatically expired ${expiredResult.count} markets.`);
+                }
+            } catch (expireErr) {
+                logger.warn(`Failed to auto-expire Kalshi markets: ${expireErr instanceof Error ? expireErr.message : 'Unknown'}`);
+            }
+            
+            // 2. Check how many active Kalshi markets we have now
             const currentCount = await prisma.market.count({
                 where: { source: 'kalshi', status: 'active' }
             });
             
-            const targetTotal = 35000;
-            
-            // 2. Determine how many new pages to fetch
-            let maxPages = 0; // Default to 0: do not fetch new markets unless under the limit
+            // 3. Determine how many new markets we need
+            let deficit = 0;
+            let maxPages = 0;
             
             if (currentCount < targetTotal) {
-                // We have room for more — fetch the difference (up to limit)
-                const deficit = targetTotal - currentCount;
+                deficit = targetTotal - currentCount;
                 maxPages = Math.ceil(deficit / limit);
+                logger.info(`Kalshi: Have ${currentCount}/${targetTotal} active markets. Deficit: ${deficit}. Fetching up to ${maxPages} pages.`);
             } else {
-                logger.info(`Kalshi: Active DB count is ${currentCount} (>= ${targetTotal}). Skipping fetch completely until old markets expire.`);
+                logger.info(`Kalshi: Active DB count is ${currentCount} (>= ${targetTotal}). Skipping fetch until old markets expire.`);
                 
                 if (currentCount > targetTotal) {
-                    // We have excess Kalshi markets in the DB, let's proactively prune them.
+                    // We still keep the pruning logic just in case the limit was manually overridden or changed
                     const excess = currentCount - targetTotal;
                     logger.info(`Kalshi active limit exceeded by ${excess}. Proactively pruning oldest active markets to enforce limit...`);
                     
                     try {
                         const oldestToPrune = await prisma.market.findMany({
                             where: { source: 'kalshi', status: 'active' },
-                            orderBy: { createdAt: 'asc' },
+                            orderBy: { id: 'asc' },
                             select: { id: true },
                             take: excess
                         });
@@ -518,9 +537,9 @@ export class AggregatorService {
                         logger.warn(`Failed to prune excess Kalshi markets: ${pruneErr instanceof Error ? pruneErr.message : 'Unknown'}`);
                     }
                 }
+                return []; // No new markets to fetch
             }
-            
-            logger.info(`Kalshi: currently have ${currentCount}/${targetTotal} active markets. Fetching up to ${maxPages} pages (${maxPages * limit} markets).`);
+
 
             while (pageCount < maxPages) {
                 const params: Record<string, any> = { limit, status: 'open' };
@@ -532,6 +551,9 @@ export class AggregatorService {
                 if (!Array.isArray(markets) || markets.length === 0) break;
 
                 for (const m of markets) {
+                    // Stop once we fill the deficit
+                    if (parsedMarkets.length >= deficit) break;
+
                     parsedMarkets.push({
                         id: `KAL-${m.ticker}`,
                         title: m.title || m.ticker || 'Unknown Kalshi Market',
@@ -553,13 +575,18 @@ export class AggregatorService {
                     });
                 }
 
+                if (parsedMarkets.length >= deficit) {
+                    logger.info(`Kalshi: Reached target limit of ${targetTotal} active markets mid-fetch.`);
+                    break;
+                }
+
                 pageCount++;
                 cursor = response.data?.cursor;
 
                 // If no cursor returned or empty, we've reached the end
                 if (!cursor) break;
 
-                logger.debug(`Kalshi: fetched page ${pageCount}, got ${markets.length} markets (total so far: ${parsedMarkets.length})`);
+                logger.debug(`Kalshi: fetched page ${pageCount}, got ${markets.length} markets (total deficit filled: ${parsedMarkets.length}/${deficit})`);
             }
 
             logger.info(`Kalshi: fetched ${parsedMarkets.length} active markets total across ${pageCount} pages`);
