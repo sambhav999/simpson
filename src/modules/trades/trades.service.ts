@@ -1,4 +1,4 @@
-﻿import { AggregatorService, TradeQuoteParams } from '../markets-aggregator/aggregator.service';
+import { AggregatorService, TradeQuoteParams } from '../markets-aggregator/aggregator.service';
 import { PrismaService } from '../../core/config/prisma.service';
 import { SolanaService } from '../solana/solana.service';
 import { logger } from '../../core/logger/logger';
@@ -33,6 +33,18 @@ export class TradesService {
     if (!market) {
       throw new AppError(`Market ${params.marketId} not found`, 404);
     }
+
+    // Check if user already has a position in this market
+    const existingPosition = await this.prisma.position.findFirst({
+      where: {
+        walletAddress: params.wallet,
+        marketId: params.marketId,
+      },
+    });
+    if (existingPosition) {
+      throw new AppError('You have already placed a bet on this question', 400);
+    }
+
     if (market.status !== 'active') {
       throw new AppError(`Market ${params.marketId} is not active`, 400);
     }
@@ -150,6 +162,17 @@ export class TradesService {
     if (exists) {
       logger.debug(`Trade ${data.signature} already indexed`);
       return exists;
+    }
+
+    // Double check single-bet constraint at recording time
+    const existingPosition = await this.prisma.position.findFirst({
+      where: {
+        walletAddress: data.walletAddress,
+        marketId: data.marketId,
+      },
+    });
+    if (existingPosition) {
+      throw new AppError('You have already placed a bet on this question', 400);
     }
     const user = await this.prisma.user.upsert({
       where: { walletAddress: data.walletAddress },
