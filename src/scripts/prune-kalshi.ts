@@ -25,7 +25,7 @@ async function main() {
     // Find the oldest excess markets by ID
     const oldestMarkets = await prisma.market.findMany({
         where: { source: 'kalshi' },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { id: 'asc' }, // Use id (ObjectId) which is indexed and contains timestamp
         select: { id: true },
         take: excess
     });
