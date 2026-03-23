@@ -92,18 +92,18 @@ export default function DailyChallengesView({
                         <h4 style={{ color: isExpired ? 'var(--text-muted)' : 'var(--text-primary)', margin: 0 }}>
                             {idx !== null ? `${idx + 1}. ` : ''}{m.market.question}
                         </h4>
-                        {myResult && myResult !== 'PENDING' && (
+                        {myResult && (
                             <span style={{ 
                                 padding: '4px 12px', 
                                 borderRadius: '20px', 
                                 fontSize: '0.75rem', 
                                 fontWeight: '900',
-                                backgroundColor: myResult === 'WIN' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                                color: myResult === 'WIN' ? '#4ade80' : '#f87171',
-                                border: `1px solid ${myResult === 'WIN' ? '#4ade80' : '#f87171'}`,
+                                backgroundColor: myResult === 'WIN' ? 'rgba(34, 197, 94, 0.1)' : (myResult === 'LOSS' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.05)'),
+                                color: myResult === 'WIN' ? '#4ade80' : (myResult === 'LOSS' ? '#f87171' : 'var(--text-dim)'),
+                                border: `1px solid ${myResult === 'WIN' ? '#4ade80' : (myResult === 'LOSS' ? '#f87171' : 'rgba(255,255,255,0.2)')}`,
                                 marginLeft: '1rem'
                             }}>
-                                {myResult === 'WIN' ? 'YOU WON' : 'YOU LOST'}
+                                {myResult === 'WIN' ? 'YOU WON' : (myResult === 'LOSS' ? 'YOU LOST' : 'PENDING')}
                             </span>
                         )}
                     </div>
