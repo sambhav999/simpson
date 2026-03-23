@@ -30,46 +30,51 @@ const debateTemplates: Record<string, { bull: string[], bear: string[] }> = {
 };
 
 async function rotateAIOracle() {
-    console.log('🔮 --- Rotating AI Oracle Predictions (Target: 36) ---');
+    console.log('🔮 --- Rotating AI Oracle Predictions (Target: 100) ---');
 
-    // 1. Get all current active AI predictions
-    const currentPredictions = await prisma.aIPrediction.findMany({
-        where: { resolved: false },
-        orderBy: { createdAt: 'asc' } // Oldest first
+    const now = new Date();
+
+    // 1. Cleanup: De-feature any predictions whose markets are no longer active
+    const cleanupResult = await prisma.aIPrediction.updateMany({
+        where: {
+            featured: true,
+            OR: [
+                { resolved: true },
+                { market: { OR: [{ status: { not: 'active' } }, { closesAt: { lt: now } }] } }
+            ]
+        },
+        data: { featured: false, featuredRank: null }
+    });
+    console.log(`Cleaned up ${cleanupResult.count} featured predictions from resolved/expired markets.`);
+
+    // 2. Increment ranks of existing featured predictions
+    await prisma.aIPrediction.updateMany({
+        where: { featured: true },
+        data: { featuredRank: { increment: 10 } }
     });
 
-    console.log(`Current active predictions: ${currentPredictions.length}`);
+    // 3. Demote those that fell out of the top 100
+    const demotionResult = await prisma.aIPrediction.updateMany({
+        where: { featured: true, featuredRank: { gt: 100 } },
+        data: { featured: false, featuredRank: null }
+    });
+    console.log(`Demoted ${demotionResult.count} predictions to 'Old' status.`);
 
-    // 2. Identify and remove oldest
-    // To maintain 36 after adding at least 6, we need to have 30 survivors.
-    // If we have LESS than 30, we don't remove anything yet to reach the target faster.
-    const removeCount = currentPredictions.length >= 36 ? 6 : 0;
-    
-    if (removeCount > 0) {
-        const toRemove = currentPredictions.slice(0, removeCount);
-        console.log(`Removing ${toRemove.length} oldest predictions.`);
-        await prisma.aIPrediction.deleteMany({
-            where: { id: { in: toRemove.map(p => p.id) } }
-        });
-    }
-
-    // 3. Add new predictions to reach 36
-    const countAfterRemoval = currentPredictions.length - removeCount;
-    const toAddCount = Math.max(6, 36 - countAfterRemoval);
-
+    // 4. Add 10 new predictions
+    const targetAdd = 10;
     const newMarkets = await prisma.market.findMany({
         where: {
             status: 'active',
             resolved: false,
+            closesAt: { gt: now },
             aiPredictions: { none: {} },
             dailyBattleMarkets: { none: {} }
         },
-        take: toAddCount,
-        orderBy: { volume: 'desc' },
-        include: { aiPredictions: true }
+        take: targetAdd,
+        orderBy: { volume: 'desc' }
     });
 
-    console.log(`Adding ${newMarkets.length} new predictions to reaching pool of 36.`);
+    console.log(`Adding ${newMarkets.length} new predictions as 'Today\'s Prediction'.`);
 
     for (let i = 0; i < newMarkets.length; i++) {
         const m = newMarkets[i];
@@ -81,9 +86,8 @@ async function rotateAIOracle() {
         const bullText = templates.bull[Math.floor(Math.random() * templates.bull.length)];
         const bearText = templates.bear[Math.floor(Math.random() * templates.bear.length)];
 
-        await (prisma.aIPrediction.create as any)({
+        await prisma.aIPrediction.create({
             data: {
-                id: `ai-deb-${m.id}-${Date.now()}`,
                 marketId: m.id,
                 prediction: side,
                 confidence: conf,
@@ -91,14 +95,14 @@ async function rotateAIOracle() {
                 bullishCommentary: bullText,
                 bearishCommentary: bearText,
                 featured: true,
-                featuredRank: i + 1
+                featuredRank: i + 1 // Newest get ranks 1-10
             }
         });
     }
 }
 
 async function rotateDailyBattle() {
-    console.log('\n⚔️ --- Rotating Daily Challenge (Target: 36) ---');
+    console.log('\n⚔️ --- Rotating Daily Challenge (Target: 100) ---');
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -108,16 +112,17 @@ async function rotateDailyBattle() {
         include: { markets: { orderBy: { position: 'asc' } } }
     });
 
-    // 1. Determine how many to carry over (Target 36, want to add at least 6)
+    // 1. Determine how many to carry over (Target 100, want to add 10)
     const currentCount = lastBattle?.markets.length || 0;
-    const removeCount = currentCount >= 36 ? 6 : 0;
+    const removeCount = currentCount >= 100 ? 10 : 0;
     const carryOverCount = currentCount - removeCount;
     const marketsToCarryOver = lastBattle ? lastBattle.markets.slice(removeCount) : [];
     
     console.log(`Carrying over ${marketsToCarryOver.length} markets.`);
 
-    // 2. Find new markets to reach 36
-    const toAddCount = Math.max(6, 36 - carryOverCount);
+    // 2. Find new markets to reach 100
+    const targetAdd = 10;
+    const toAddCount = Math.max(targetAdd, 100 - carryOverCount);
     const existingMarketIds = marketsToCarryOver.map(bm => bm.marketId);
     
     const newMarkets = await prisma.market.findMany({
@@ -131,7 +136,7 @@ async function rotateDailyBattle() {
         orderBy: { volume: 'desc' }
     });
 
-    console.log(`Adding ${newMarkets.length} new markets to reach 36.`);
+    console.log(`Adding ${newMarkets.length} new markets to reach 100.`);
 
     // 3. Create or Update today's battle
     const existingToday = await prisma.dailyBattle.findUnique({
@@ -179,7 +184,7 @@ async function rotateDailyBattle() {
         }
     });
 
-    console.log(`✅ Created daily battle with 36 markets and debates.`);
+    console.log(`✅ Created daily battle with ${marketsToCarryOver.length + newMarkets.length} markets and debates.`);
 }
 
 async function main() {

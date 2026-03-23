@@ -8,28 +8,54 @@ export class PredictionsService {
     private readonly redis = RedisService.getInstance();
 
     /**
-     * Get all Homer Baba AI predictions with stats
+     * Get 3-tier AI predictions: Today's (100), Old (All Active), and Expired (500)
      */
-    async getAIPredictions(filter: { status?: string; result?: string; limit?: number; offset?: number }) {
-        const { status, result, limit = 20, offset = 0 } = filter;
-
-        const where: any = {};
-        if (status === 'pending') where.resolved = false;
-        if (status === 'resolved') where.resolved = true;
-        if (result) where.result = result.toUpperCase();
-
-        const [predictions, total] = await Promise.all([
+    async getAIPredictions() {
+        const [todays_raw, old_raw, expired_raw] = await Promise.all([
+            // 1. Todays Predictions (Featured, Top 100)
             this.prisma.aIPrediction.findMany({
-                where,
+                where: { featured: true },
+                include: { market: true },
+                orderBy: { featuredRank: 'asc' },
+                take: 100
+            }),
+            // 2. Old Predictions (Active but not featured)
+            this.prisma.aIPrediction.findMany({
+                where: { featured: false, resolved: false },
+                include: { market: true },
+                orderBy: { createdAt: 'desc' }
+            }),
+            // 3. Expired Markets (Resolved)
+            this.prisma.aIPrediction.findMany({
+                where: { resolved: true },
                 include: { market: true },
                 orderBy: { createdAt: 'desc' },
-                take: limit,
-                skip: offset,
-            }),
-            this.prisma.aIPrediction.count({ where }),
+                take: 500
+            })
         ]);
 
-        // Calculate stats directly via DB counts instead of fetching all records
+        const mapPrediction = (p: any) => ({
+            id: p.id,
+            market: {
+                id: p.market.id,
+                question: p.market.title,
+                closes_at: p.market.closesAt || p.market.expiry,
+                image: p.market.image,
+                source: p.market.source,
+            },
+            prediction: p.prediction,
+            confidence: p.confidence,
+            summary_commentary: p.summaryCommentary,
+            bullish_commentary: p.bullishCommentary,
+            bearish_commentary: p.bearishCommentary,
+            commentary: p.commentary,
+            created_at: p.createdAt,
+            resolved: p.resolved,
+            result: p.result,
+            featured_rank: p.featuredRank
+        });
+
+        // Calculate stats
         const [wins, losses, pending] = await Promise.all([
             this.prisma.aIPrediction.count({ where: { resolved: true, result: 'WIN' } }),
             this.prisma.aIPrediction.count({ where: { resolved: true, result: 'LOSS' } }),
@@ -38,33 +64,15 @@ export class PredictionsService {
         const totalResolved = wins + losses;
 
         return {
-            predictions: predictions.map(p => ({
-                id: p.id,
-                market: {
-                    id: p.market.id,
-                    question: p.market.title,
-                    closes_at: p.market.closesAt || p.market.expiry,
-                    image: p.market.image,
-                },
-                prediction: p.prediction,
-                confidence: p.confidence,
-                summary_commentary: p.summaryCommentary,
-                bullish_commentary: p.bullishCommentary,
-                bearish_commentary: p.bearishCommentary,
-                commentary: p.commentary,
-                created_at: p.createdAt,
-                resolved: p.resolved,
-                result: p.result,
-            })),
+            todays_predictions: todays_raw.map(mapPrediction),
+            old_predictions: old_raw.map(mapPrediction),
+            expired_predictions: expired_raw.map(mapPrediction),
             stats: {
                 total_predictions: totalResolved + pending,
                 wins,
                 losses,
                 accuracy: totalResolved > 0 ? wins / totalResolved : 0,
-            },
-            total,
-            limit,
-            offset,
+            }
         };
     }
 

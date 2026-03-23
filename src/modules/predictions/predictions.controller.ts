@@ -6,16 +6,10 @@ import { requireAuth, optionalAuth } from '../../core/config/auth.middleware';
 const router = Router();
 const predictionsService = new PredictionsService();
 
-// GET /api/predictions/ai — Homer Baba predictions
+// GET /api/predictions/ai — Homer Baba predictions (3-tier)
 router.get('/ai', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { status, result, limit, offset } = req.query;
-        const data = await predictionsService.getAIPredictions({
-            status: status as string | undefined,
-            result: result as string | undefined,
-            limit: limit ? Number(limit) : undefined,
-            offset: offset ? Number(offset) : undefined,
-        });
+        const data = await predictionsService.getAIPredictions();
         res.json(data);
     } catch (err) {
         next(err);
