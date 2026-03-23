@@ -11,20 +11,14 @@ const prisma = PrismaService.getInstance();
 const redis = RedisService.getInstance();
 const CACHE_TTL = 300; // 5 minutes
 
-// GET /api/daily — Today's Daily battle
+// GET /api/daily — 3-tier Daily challenges
 router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Try Cache first if not logged in (personal stats break global cache)
-        const cacheKey = `daily:battle:${req.user ? req.user.wallet : 'guest'}`;
-        if (!req.user) {
-            const cached = await redis.get('daily:battle:global');
-            if (cached) return res.json(JSON.parse(cached));
-        }
-
-        let battle = await prisma.dailyBattle.findFirst({
+        // Fetch latest battle for "Today's Challenges"
+        const latestBattle = await prisma.dailyBattle.findFirst({
             orderBy: { date: 'desc' },
             include: {
                 markets: {
@@ -38,101 +32,130 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
             },
         });
 
-        if (!battle) {
-            // Auto-generate today's battle if it doesn't exist
-            const unfeaturedMarkets = await prisma.market.findMany({
-                where: {
-                    status: 'active',
-                    resolved: false,
-                    aiPredictions: { none: {} },
-                },
-            });
-
-            if (unfeaturedMarkets.length < 10) {
-                return res.json({ message: 'Not enough active markets to generate a daily battle today', markets: [] });
-            }
-
-            // Shuffle and pick 36
-            const shuffled = unfeaturedMarkets.sort(() => 0.5 - Math.random());
-            const numMarkets = 36;
-            const selectedMarkets = shuffled.slice(0, numMarkets);
-
-            battle = await prisma.dailyBattle.create({
-                data: {
-                    date: today,
-                    status: 'active',
-                    markets: {
-                        create: selectedMarkets.map((m, idx) => ({
-                            marketId: m.id,
-                            position: idx + 1,
-                            homerPrediction: Math.random() > 0.5 ? 'YES' : 'NO',
-                            homerConfidence: Math.floor(Math.random() * 41) + 50, // 50 to 90
-                            homerCommentary: 'Homer Baba sees this outcome clearly in the decentralized stars.',
-                        })),
-                    },
-                },
-                include: {
-                    markets: {
-                        include: {
-                            market: {
-                                select: { id: true, title: true, yesPrice: true, noPrice: true, source: true, image: true, closesAt: true, expiry: true, status: true, category: true },
-                            },
-                        },
-                        orderBy: { position: 'asc' },
-                    },
-                },
-            });
+        if (!latestBattle) {
+            return res.json({ status: 'success', data: { todays_challenges: [], old_challenges: [], expired_challenges: [] } });
         }
 
-        // Get user predictions if logged in
+        // Fetch user predictions for filtering/display
         let userPredictions: any[] = [];
         if (req.user) {
             userPredictions = await prisma.userDailyPrediction.findMany({
-                where: {
-                    userId: req.user.wallet,
-                    dailyBattleMarketId: { in: battle.markets.map(m => m.id) },
-                },
+                where: { userId: req.user.wallet },
             });
         }
-
         const userPredMap = new Map(userPredictions.map(p => [p.dailyBattleMarketId, p.prediction]));
 
-        const responseData = {
-            id: battle.id,
-            date: battle.date,
-            status: battle.status,
-            markets: battle.markets.map(m => ({
-                id: m.id,
-                position: m.position,
-                market: {
-                    id: m.market.id,
-                    question: m.market.title,
-                    yes_price: m.market.yesPrice,
-                    no_price: m.market.noPrice,
-                    source: m.market.source,
-                    image_url: m.market.image,
-                    closes_at: m.market.closesAt || m.market.expiry,
-                    status: m.market.status,
-                    category: m.market.category,
-                },
-                homer_prediction: m.homerPrediction,
-                homer_confidence: m.homerConfidence,
-                homer_commentary: m.homerCommentary,
-                result: m.result,
-                user_prediction: userPredMap.get(m.id) || null,
-            })),
-            user_stats: {
-                participated: userPredictions.length > 0,
-                predictions_made: userPredictions.length,
+        // 1. Today's Challenges
+        const todays = latestBattle.markets.map(m => ({
+            id: m.id,
+            position: m.position,
+            market: {
+                id: m.market.id,
+                question: m.market.title,
+                yes_price: m.market.yesPrice,
+                no_price: m.market.noPrice,
+                source: m.market.source,
+                image_url: m.market.image,
+                closes_at: m.market.closesAt || m.market.expiry,
+                status: m.market.status,
+                category: m.market.category,
             },
-        };
+            homer_prediction: m.homerPrediction,
+            homer_confidence: m.homerConfidence,
+            homer_commentary: m.homerCommentary,
+            result: m.result,
+            user_prediction: userPredMap.get(m.id) || null,
+        }));
 
-        // Cache global version for 5 mins
-        if (!req.user) {
-            await redis.setex('daily:battle:global', CACHE_TTL, JSON.stringify(responseData));
-        }
+        // 2. Old Challenges (Active markets from previous battles)
+        // Find all DailyBattleMarket IDs that are NOT in the latest battle
+        const latestMarketIds = latestBattle.markets.map(m => m.id);
+        const oldMarkets = await prisma.dailyBattleMarket.findMany({
+            where: {
+                id: { notIn: latestMarketIds },
+                result: 'PENDING',
+                market: {
+                    status: 'active',
+                    resolved: false
+                }
+            },
+            include: {
+                market: {
+                    select: { id: true, title: true, yesPrice: true, noPrice: true, source: true, image: true, closesAt: true, expiry: true, status: true, category: true },
+                }
+            },
+            orderBy: { dailyBattle: { date: 'desc' } },
+            take: 100
+        });
 
-        res.json(responseData);
+        const old = oldMarkets.map(m => ({
+            id: m.id,
+            position: m.position,
+            market: {
+                id: m.market.id,
+                question: m.market.title,
+                yes_price: m.market.yesPrice,
+                no_price: m.market.noPrice,
+                source: m.market.source,
+                image_url: m.market.image,
+                closes_at: m.market.closesAt || m.market.expiry,
+                status: m.market.status,
+                category: m.market.category,
+            },
+            homer_prediction: m.homerPrediction,
+            homer_confidence: m.homerConfidence,
+            homer_commentary: m.homerCommentary,
+            result: m.result,
+            user_prediction: userPredMap.get(m.id) || null,
+        }));
+
+        // 3. Expired Challenges (Resolved battle markets)
+        const expiredMarkets = await prisma.dailyBattleMarket.findMany({
+            where: {
+                result: { in: ['WIN', 'LOSS'] }
+            },
+            include: {
+                market: {
+                    select: { id: true, title: true, yesPrice: true, noPrice: true, source: true, image: true, closesAt: true, expiry: true, status: true, category: true },
+                }
+            },
+            orderBy: { dailyBattle: { date: 'desc' } },
+            take: 500
+        });
+
+        const expired = expiredMarkets.map(m => ({
+            id: m.id,
+            position: m.position,
+            market: {
+                id: m.market.id,
+                question: m.market.title,
+                yes_price: m.market.yesPrice,
+                no_price: m.market.noPrice,
+                source: m.market.source,
+                image_url: m.market.image,
+                closes_at: m.market.closesAt || m.market.expiry,
+                status: m.market.status,
+                category: m.market.category,
+            },
+            homer_prediction: m.homerPrediction,
+            homer_confidence: m.homerConfidence,
+            homer_commentary: m.homerCommentary,
+            result: m.result,
+            user_prediction: userPredMap.get(m.id) || null,
+        }));
+
+        res.json({
+            status: 'success',
+            data: {
+                todays_challenges: todays,
+                old_challenges: old,
+                expired_challenges: expired,
+                user_stats: {
+                    participated_today: userPredictions.some(p => latestMarketIds.includes(p.dailyBattleMarketId)),
+                    total_participated: userPredictions.length
+                }
+            }
+        });
     } catch (err) {
         next(err);
     }

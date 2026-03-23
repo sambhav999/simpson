@@ -3,7 +3,9 @@
 const API = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
 export default function DailyChallengesView({
-    dailyBattle,
+    todaysChallenges,
+    oldChallenges,
+    expiredChallenges,
     dailyScoreboard,
     dailyUserStats,
     dailyLeaderboard,
@@ -24,28 +26,38 @@ export default function DailyChallengesView({
         setUserPredictions((prev: any) => ({ ...prev, [marketId]: prediction }));
     };
 
-    const submitDailyPredictions = async () => {
+    const submitDailyPredictions = async (targetChallenges: any[]) => {
         const token = localStorage.getItem('auth_token');
         if (!token) {
             alert("Please connect wallet and sign in first.");
             return;
         }
-        const predictionsArray = Object.entries(userPredictions).map(([marketId, prediction]) => ({
-            daily_battle_market_id: marketId,
-            prediction
-        }));
-        const totalMarkets = dailyBattle?.markets?.length || 0;
-        if (predictionsArray.length < totalMarkets) return;
+
+        const predictionsForTarget = targetChallenges
+            .filter((m: any) => userPredictions[m.id])
+            .map((m: any) => ({
+                daily_battle_market_id: m.id,
+                prediction: userPredictions[m.id]
+            }));
+
+        if (predictionsForTarget.length === 0) return;
+
         setSubmittingDaily(true);
         try {
             const res = await fetch(`${API}/api/daily/predict`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ predictions: predictionsArray })
+                body: JSON.stringify({ predictions: predictionsForTarget })
             });
             if (res.ok) {
                 alert("Predictions submitted!");
                 fetchDailyData();
+                // Clear the predictions from local state for these markets
+                setUserPredictions((prev: any) => {
+                    const next = { ...prev };
+                    targetChallenges.forEach(m => delete next[m.id]);
+                    return next;
+                });
             } else {
                 const err = await res.json();
                 alert(err.message || "Failed to submit predictions");
@@ -58,8 +70,46 @@ export default function DailyChallengesView({
         }
     };
 
-    const hasParticipated = dailyBattle?.user_stats?.participated;
-    const numSelected = Object.keys(userPredictions).length;
+    const renderChallengeCard = (m: any, idx: number | null, isExpired = false) => {
+        const isLocked = !!m.user_prediction;
+        const myPick = isLocked ? m.user_prediction : userPredictions[m.id];
+        
+        return (
+            <div key={m.id} className={`daily-card ${isExpired ? 'glass-effect' : 'aura-border'}`} style={{ display: 'flex', gap: '2rem', marginBottom: '1rem', alignItems: 'center', opacity: isExpired ? 0.7 : 1 }}>
+                <div 
+                    className="arena-market-img" 
+                    style={{ 
+                        backgroundImage: `url(${m.market.image_url || m.market.image || ''})`,
+                        filter: isExpired ? 'grayscale(0.5)' : 'none'
+                    }}
+                ></div>
+                <div style={{ flex: 1 }}>
+                    <h4 style={{ color: isExpired ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                        {idx !== null ? `${idx + 1}. ` : ''}{m.market.question}
+                    </h4>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                        <div style={{ flex: 1, padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                            <div style={{ color: isExpired ? 'var(--text-muted)' : 'var(--accent-purple)', fontSize: '0.7rem' }}>
+                                {isExpired ? 'RESULT' : "HOMER'S PICK"}
+                            </div>
+                            <div style={{ fontWeight: 'bold' }}>
+                                {m.homer_prediction} ({m.homer_confidence}%)
+                                {isExpired && <span style={{ marginLeft: '1rem', color: m.result === 'WIN' ? 'var(--accent-green)' : 'var(--accent-red)' }}>[{m.result}]</span>}
+                            </div>
+                            <p style={{ fontStyle: 'italic', fontSize: '0.8rem', marginBottom: '0.8rem' }}>"{m.homer_commentary || 'Homer Baba detects strong currents...'}"</p>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '100px' }}>
+                            <button className={`dm-btn yes-btn ${myPick === 'YES' ? 'selected' : ''}`} disabled={isLocked || isExpired} onClick={() => handlePrediction(m.id, 'YES')}>YES</button>
+                            <button className={`dm-btn no-btn ${myPick === 'NO' ? 'selected' : ''}`} disabled={isLocked || isExpired} onClick={() => handlePrediction(m.id, 'NO')}>NO</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const todaysPendingCount = todaysChallenges.filter((m: any) => !m.user_prediction && userPredictions[m.id]).length;
+    const oldPendingCount = oldChallenges.filter((m: any) => !m.user_prediction && userPredictions[m.id]).length;
 
     return (
         <main className="main-content">
@@ -70,7 +120,7 @@ export default function DailyChallengesView({
                 </div>
 
                 {dailyScoreboard && (
-                    <div className="homer-vs-community">
+                    <div className="homer-vs-community" style={{ marginBottom: '3rem' }}>
                         <div className="side"><div>🔮</div><h4>Homer</h4><div>{(dailyScoreboard.all_time.homer_baba.accuracy * 100).toFixed(1)}%</div></div>
                         <div className="vs-badge">VS</div>
                         <div className="side"><div>🧠</div><h4>Users</h4><div>{(dailyScoreboard.all_time.community.accuracy * 100).toFixed(1)}%</div></div>
@@ -78,71 +128,92 @@ export default function DailyChallengesView({
                 )}
 
                 {walletAddress && dailyUserStats && (
-                    <div className="oracle-border pulse-glow" style={{ padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <div className="oracle-border pulse-glow" style={{ padding: '1.5rem', borderRadius: '12px', marginBottom: '4rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
                         <div style={{ flex: 1 }}><h4>YOUR ARENA RECORD</h4><div>{dailyUserStats.wins} Wins | {(dailyUserStats.accuracy * 100).toFixed(1)}% Accuracy</div></div>
                         <div className="prophet-badge rank-legendary">LEGENDARY PROPHET</div>
                     </div>
                 )}
 
-                <div className="arena-markets">
-                    {dailyBattle?.markets.map((m: any, idx: number) => {
-                        const isLocked = hasParticipated;
-                        const myPick = isLocked ? m.user_prediction : userPredictions[m.id];
-                        return (
-                            <div key={m.id} className="daily-card" style={{ display: 'flex', gap: '2rem', marginBottom: '1rem', alignItems: 'center' }}>
-                                <div 
-                                    className="arena-market-img" 
-                                    style={{ 
-                                        backgroundImage: `url(${m.market.image_url || m.market.image || ''})` 
-                                    }}
-                                ></div>
-                                <div style={{ flex: 1 }}>
-                                    <h4>{idx + 1}. {m.market.question}</h4>
-                                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                                        <div style={{ flex: 1, padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                                            <div style={{ color: 'var(--accent-purple)', fontSize: '0.7rem' }}>HOMER'S PICK</div>
-                                            <div style={{ fontWeight: 'bold' }}>{m.homer_prediction} ({m.homer_confidence}%)</div>
-                                            <p style={{ fontStyle: 'italic', fontSize: '0.8rem', marginBottom: '0.8rem' }}>"{m.homer_commentary || 'Homer Baba detects strong currents...'}"</p>
-                                            
-                                            {(m.bullish_commentary || m.bearish_commentary) && (
-                                                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                                    <div style={{ flex: 1, fontSize: '0.65rem', padding: '0.4rem', background: 'rgba(175,82,222,0.08)', borderRadius: '4px', borderLeft: '2px solid var(--accent-purple)' }}>
-                                                        <span style={{ fontWeight: 'bold', color: 'var(--accent-purple)' }}>BULL:</span> {m.bullish_commentary?.slice(0, 60)}...
-                                                    </div>
-                                                    <div style={{ flex: 1, fontSize: '0.65rem', padding: '0.4rem', background: 'rgba(0,122,255,0.08)', borderRadius: '4px', borderLeft: '2px solid var(--accent-blue)' }}>
-                                                        <span style={{ fontWeight: 'bold', color: 'var(--accent-blue)' }}>BEAR:</span> {m.bearish_commentary?.slice(0, 60)}...
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            <button className={`dm-btn yes-btn ${myPick === 'YES' ? 'selected' : ''}`} disabled={isLocked} onClick={() => handlePrediction(m.id, 'YES')}>YES</button>
-                                            <button className={`dm-btn no-btn ${myPick === 'NO' ? 'selected' : ''}`} disabled={isLocked} onClick={() => handlePrediction(m.id, 'NO')}>NO</button>
-                                        </div>
-                                    </div>
-                                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5rem' }}>
+                    {/* section 1: Today's Challenges */}
+                    <section>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--accent-purple)', boxShadow: '0 0 10px var(--accent-purple)' }}></div>
+                                <h2 style={{ margin: 0 }}>Today's Challenge</h2>
+                                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.8rem' }}>{todaysChallenges.length} Active</span>
                             </div>
-                        );
-                    })}
+                            {todaysPendingCount > 0 && (
+                                <button className="trade-btn" onClick={() => submitDailyPredictions(todaysChallenges)} disabled={submittingDaily} style={{ padding: '0.5rem 1.5rem' }}>
+                                    Lock In Today's ({todaysPendingCount})
+                                </button>
+                            )}
+                        </div>
+                        <div className="arena-markets">
+                            {todaysChallenges.length > 0 ? (
+                                todaysChallenges.map((m: any, i: number) => renderChallengeCard(m, i))
+                            ) : (
+                                <div className="glass-effect" style={{ padding: '3rem', textAlign: 'center', borderRadius: '12px', opacity: 0.5 }}>The arena is silent. New challenges arriving soon.</div>
+                            )}
+                        </div>
+                    </section>
+
+                    {/* section 2: Old Challenges */}
+                    <section>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--accent-blue)', opacity: 0.6 }}></div>
+                                <h2 style={{ margin: 0 }}>Old Challenges</h2>
+                                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.8rem' }}>{oldChallenges.length} Active</span>
+                            </div>
+                            {oldPendingCount > 0 && (
+                                <button className="trade-btn" onClick={() => submitDailyPredictions(oldChallenges)} disabled={submittingDaily} style={{ padding: '0.5rem 1.5rem', background: 'var(--accent-blue)' }}>
+                                    Lock In Old ({oldPendingCount})
+                                </button>
+                            )}
+                        </div>
+                        <div className="arena-markets">
+                            {oldChallenges.length > 0 ? (
+                                oldChallenges.map((m: any) => renderChallengeCard(m, null))
+                            ) : (
+                                <div className="glass-effect" style={{ padding: '3rem', textAlign: 'center', borderRadius: '12px', opacity: 0.5 }}>No older challenges available right now.</div>
+                            )}
+                        </div>
+                    </section>
+
+                    {/* section 3: Expired Challenges */}
+                    <section>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--text-muted)' }}></div>
+                            <h2 style={{ margin: 0 }}>Expired Challenges</h2>
+                            <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.8rem' }}>Past {expiredChallenges.length}</span>
+                        </div>
+                        <div className="arena-markets">
+                            {expiredChallenges.length > 0 ? (
+                                expiredChallenges.map((m: any) => renderChallengeCard(m, null, true))
+                            ) : (
+                                <div className="glass-effect" style={{ padding: '3rem', textAlign: 'center', borderRadius: '12px', opacity: 0.5 }}>No expired challenges in the current archive.</div>
+                            )}
+                        </div>
+                    </section>
                 </div>
 
-                {dailyBattle && !hasParticipated && (
-                    <button className="trade-btn" disabled={numSelected < (dailyBattle.markets?.length || 0) || submittingDaily} onClick={submitDailyPredictions} style={{ width: '100%', padding: '1.5rem', marginTop: '2rem' }}>
-                        {submittingDaily ? 'Submitting...' : numSelected < (dailyBattle.markets?.length || 0) ? `Select ${(dailyBattle.markets?.length || 0) - numSelected} more` : 'Lock In All Picks (+10 XP)'}
-                    </button>
-                )}
-
                 {dailyLeaderboard?.length > 0 && (
-                    <div style={{ marginTop: '3rem' }}>
-                        <h3 style={{ marginBottom: '1rem' }}>Daily Arena Leaders</h3>
-                        <div className="leaderboard-table-wrapper" style={{ background: 'var(--bg-card)', borderRadius: '12px' }}>
+                    <div style={{ marginTop: '6rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                            <h2 style={{ margin: 0 }}>Daily Arena Leaders</h2>
+                        </div>
+                        <div className="leaderboard-table-wrapper" style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)' }}>
                             <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
                                 <thead><tr style={{ background: 'rgba(255,255,255,0.03)' }}><th style={{ padding: '0.75rem 1rem' }}>Prophet</th><th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Accuracy</th></tr></thead>
                                 <tbody>
                                     {dailyLeaderboard.map((entry: any, i: number) => (
                                         <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                                            <td style={{ padding: '0.75rem 1rem' }}>{entry.user?.id?.substring(0, 8) || 'User'}...</td>
-                                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold' }}>{(entry.accuracy * 100).toFixed(1)}%</td>
+                                            <td style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(175,82,222,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>{i + 1}</div>
+                                                {entry.user?.id?.substring(0, 12) || 'User'}...
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--accent-green)' }}>{(entry.accuracy * 100).toFixed(1)}%</td>
                                         </tr>
                                     ))}
                                 </tbody>

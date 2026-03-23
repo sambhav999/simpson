@@ -99,7 +99,17 @@ function App() {
   const [portfolioRefreshTrigger, setPortfolioRefreshTrigger] = useState(0);
 
   // Daily State
-  const [dailyBattle, setDailyBattle] = useState<any>(null);
+  const [dailyTiers, setDailyTiers] = useState<{
+    todays_challenges: any[];
+    old_challenges: any[];
+    expired_challenges: any[];
+    user_stats: any;
+  }>({
+    todays_challenges: [],
+    old_challenges: [],
+    expired_challenges: [],
+    user_stats: null
+  });
   const [dailyScoreboard, setDailyScoreboard] = useState<any>(null);
   const [dailyUserStats, setDailyUserStats] = useState<any>(null);
   const [dailyLeaderboard, setDailyLeaderboard] = useState<any[]>([]);
@@ -292,7 +302,12 @@ function App() {
       const results = await Promise.all(fetches);
       const [battleRes, scoreboardRes, userStatsRes] = results;
 
-      if (battleRes && battleRes.ok) setDailyBattle(await battleRes.json());
+      if (battleRes && battleRes.ok) {
+        const json = await battleRes.json();
+        if (json.status === 'success' && json.data) {
+          setDailyTiers(json.data);
+        }
+      }
       if (scoreboardRes && scoreboardRes.ok) setDailyScoreboard(await scoreboardRes.json());
       if (userStatsRes && userStatsRes.ok) setDailyUserStats(await userStatsRes.json());
 
@@ -683,7 +698,9 @@ function App() {
 
           {currentView === 'daily' && (
             <DailyChallengesView
-              dailyBattle={dailyBattle}
+              todaysChallenges={dailyTiers.todays_challenges}
+              oldChallenges={dailyTiers.old_challenges}
+              expiredChallenges={dailyTiers.expired_challenges}
               dailyScoreboard={dailyScoreboard}
               dailyUserStats={dailyUserStats}
               dailyLeaderboard={dailyLeaderboard}
