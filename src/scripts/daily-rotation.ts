@@ -66,7 +66,10 @@ async function rotateAIOracle() {
         where: {
             status: 'active',
             resolved: false,
-            closesAt: { gt: now },
+            OR: [
+                { closesAt: { gt: now } },
+                { AND: [{ closesAt: null }, { expiry: { gt: now } }] }
+            ],
             aiPredictions: { none: {} },
             dailyBattleMarkets: { none: {} }
         },
@@ -104,6 +107,7 @@ async function rotateAIOracle() {
 async function rotateDailyBattle() {
     console.log('\n⚔️ --- Rotating Daily Challenge (Target: 100) ---');
 
+    const now = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -129,6 +133,10 @@ async function rotateDailyBattle() {
         where: {
             status: 'active',
             resolved: false,
+            OR: [
+                { closesAt: { gt: now } },
+                { AND: [{ closesAt: null }, { expiry: { gt: now } }] }
+            ],
             id: { notIn: existingMarketIds },
             aiPredictions: { none: {} }
         },
