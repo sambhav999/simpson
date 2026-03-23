@@ -105,30 +105,16 @@ async function rotateAIOracle() {
 }
 
 async function rotateDailyBattle() {
-    console.log('\n⚔️ --- Rotating Daily Challenge (Target: 100) ---');
+    console.log('\n⚔️ --- Rotating Daily Challenge (Target: 10) ---');
 
     const now = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const lastBattle = await prisma.dailyBattle.findFirst({
-        orderBy: { date: 'desc' },
-        include: { markets: { orderBy: { position: 'asc' } } }
-    });
-
-    // 1. Determine how many to carry over (Target 100, want to add 10)
-    const currentCount = lastBattle?.markets.length || 0;
-    const removeCount = currentCount >= 100 ? 10 : 0;
-    const carryOverCount = currentCount - removeCount;
-    const marketsToCarryOver = lastBattle ? lastBattle.markets.slice(removeCount) : [];
-    
-    console.log(`Carrying over ${marketsToCarryOver.length} markets.`);
-
-    // 2. Find new markets to reach 100
+    // 1. Remove old battle carry-over (Target 10 new markets only for Today)
     const targetAdd = 10;
-    const toAddCount = Math.max(targetAdd, 100 - carryOverCount);
-    const existingMarketIds = marketsToCarryOver.map(bm => bm.marketId);
     
+    // 2. Find new markets
     const newMarkets = await prisma.market.findMany({
         where: {
             status: 'active',
@@ -137,14 +123,14 @@ async function rotateDailyBattle() {
                 { closesAt: { gt: now } },
                 { expiry: { gt: now } }
             ],
-            id: { notIn: existingMarketIds },
-            aiPredictions: { none: {} }
+            aiPredictions: { none: {} },
+            dailyBattleMarkets: { none: {} } // Ensure they haven't been in a battle before if we want fresh ones
         },
-        take: toAddCount,
+        take: targetAdd,
         orderBy: { volume: 'desc' }
     });
 
-    console.log(`Adding ${newMarkets.length} new markets to reach 100.`);
+    console.log(`Adding ${newMarkets.length} new markets to Today's Challenge.`);
 
     // 3. Create or Update today's battle
     const existingToday = await prisma.dailyBattle.findUnique({
@@ -162,15 +148,6 @@ async function rotateDailyBattle() {
             status: 'active',
             markets: {
                 create: [
-                    ...marketsToCarryOver.map((bm: any, idx) => ({
-                        marketId: bm.marketId,
-                        position: idx + 1,
-                        homerPrediction: bm.homerPrediction,
-                        homerConfidence: bm.homerConfidence,
-                        homerCommentary: bm.homerCommentary,
-                        bullishCommentary: bm.bullishCommentary,
-                        bearishCommentary: bm.bearishCommentary
-                    })),
                     ...newMarkets.map((m, idx) => {
                         const cat = m.category === 'Crypto' ? 'Crypto' : 'General';
                         const templates = debateTemplates[cat];
@@ -179,7 +156,7 @@ async function rotateDailyBattle() {
                         
                         return {
                             marketId: m.id,
-                            position: marketsToCarryOver.length + idx + 1,
+                            position: idx + 1,
                             homerPrediction: Math.random() > 0.5 ? 'YES' : 'NO',
                             homerConfidence: 60 + Math.floor(Math.random() * 30),
                             homerCommentary: `Homer Baba detects strong currents in ${m.category} for this market.`,
@@ -192,7 +169,7 @@ async function rotateDailyBattle() {
         }
     });
 
-    console.log(`✅ Created daily battle with ${marketsToCarryOver.length + newMarkets.length} markets and debates.`);
+    console.log(`✅ Created daily battle with ${newMarkets.length} markets and debates.`);
 }
 
 async function main() {
