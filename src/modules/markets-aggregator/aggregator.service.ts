@@ -120,6 +120,9 @@ export class AggregatorService {
         try {
             logger.debug('Fetching markets from Aggregator APIs');
 
+            // Pre-fetch cleanup: Mark expired markets as 'expired'
+            await this.expireMarkets();
+
             const [limitlessRes, polymarketRes, manifoldRes, hedgehogRes, kalshiRes, sxbetRes] = await Promise.allSettled([
                 this.fetchLimitlessMarkets(),
                 this.fetchPolymarketMarkets(),
@@ -174,6 +177,28 @@ export class AggregatorService {
             const message = error instanceof Error ? error.message : 'Unknown error';
             logger.error(`Failed to fetch markets from Aggregator: ${message}`);
             throw new AppError(`Aggregator markets fetch failed: ${message}`, 502);
+        }
+    }
+
+    private async expireMarkets(): Promise<void> {
+        try {
+            const prisma = PrismaService.getInstance();
+            const now = new Date();
+            const result = await prisma.market.updateMany({
+                where: {
+                    status: 'active',
+                    OR: [
+                        { closesAt: { lt: now } },
+                        { expiry: { lt: now } }
+                    ]
+                },
+                data: { status: 'expired' }
+            });
+            if (result.count > 0) {
+                logger.info(`Aggregator: Automatically expired ${result.count} stale markets.`);
+            }
+        } catch (err) {
+            logger.warn(`Failed to auto-expire stale markets: ${err instanceof Error ? err.message : 'Unknown'}`);
         }
     }
 
@@ -478,24 +503,6 @@ export class AggregatorService {
             
             const targetTotal = 35000;
             const prisma = PrismaService.getInstance();
-            const now = new Date();
-
-            // 1. Mark expired markets as 'expired' before counting active ones
-            try {
-                const expiredResult = await prisma.market.updateMany({
-                    where: {
-                        source: 'kalshi',
-                        status: 'active',
-                        expiry: { lt: now }
-                    },
-                    data: { status: 'expired' }
-                });
-                if (expiredResult.count > 0) {
-                    logger.info(`Kalshi: Automatically expired ${expiredResult.count} markets.`);
-                }
-            } catch (expireErr) {
-                logger.warn(`Failed to auto-expire Kalshi markets: ${expireErr instanceof Error ? expireErr.message : 'Unknown'}`);
-            }
             
             // 2. Check how many active Kalshi markets we have now
             const currentCount = await prisma.market.count({
