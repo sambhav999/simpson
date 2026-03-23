@@ -12,16 +12,31 @@ export class PredictionsService {
      */
     async getAIPredictions() {
         const [todays_raw, old_raw, expired_raw] = await Promise.all([
-            // 1. Todays Predictions (Featured, Top 100)
             this.prisma.aIPrediction.findMany({
-                where: { featured: true },
+                where: { 
+                    featured: true,
+                    market: {
+                        OR: [
+                            { closesAt: { gt: new Date() } },
+                            { expiry: { gt: new Date() } }
+                        ]
+                    }
+                },
                 include: { market: true },
                 orderBy: { featuredRank: 'asc' },
                 take: 100
             }),
-            // 2. Old Predictions (Active but not featured)
             this.prisma.aIPrediction.findMany({
-                where: { featured: false, resolved: false },
+                where: { 
+                    featured: false, 
+                    resolved: false,
+                    market: {
+                        OR: [
+                            { closesAt: { gt: new Date() } },
+                            { expiry: { gt: new Date() } }
+                        ]
+                    }
+                },
                 include: { market: true },
                 orderBy: { createdAt: 'desc' }
             }),

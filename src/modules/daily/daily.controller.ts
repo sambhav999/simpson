@@ -22,6 +22,14 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
             orderBy: { date: 'desc' },
             include: {
                 markets: {
+                    where: {
+                        market: {
+                            OR: [
+                                { closesAt: { gt: today } },
+                                { expiry: { gt: today } }
+                            ]
+                        }
+                    },
                     include: {
                         market: {
                             select: { id: true, title: true, yesPrice: true, noPrice: true, source: true, image: true, closesAt: true, expiry: true, status: true, category: true },
@@ -76,7 +84,11 @@ router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunc
                 result: 'PENDING',
                 market: {
                     status: 'active',
-                    resolved: false
+                    resolved: false,
+                    OR: [
+                        { closesAt: { gt: today } },
+                        { expiry: { gt: today } }
+                    ]
                 }
             },
             include: {
