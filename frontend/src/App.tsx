@@ -107,10 +107,18 @@ function App() {
   const [submittingDaily, setSubmittingDaily] = useState(false);
 
   // AI Oracle State
-  const [aiPredictions, setAIPredictions] = useState<AIPrediction[]>([]);
+  const [aiTiers, setAITiers] = useState<{
+    todays_predictions: AIPrediction[];
+    old_predictions: AIPrediction[];
+    expired_predictions: AIPrediction[];
+  }>({
+    todays_predictions: [],
+    old_predictions: [],
+    expired_predictions: []
+  });
   const [aiMisses, setAIMisses] = useState<any[]>([]);
   const [aiLoading, setAILoading] = useState(false);
-  const [oracleStatus, setOracleStatus] = useState('pending'); // 'pending' (Active) or 'resolved' (Expired)
+  const [oracleStatus] = useState('pending'); // Keep for compatibility if needed elsewhere, but not used by OracleView anymore
 
 
   // Wallet Adapters integration
@@ -300,18 +308,23 @@ function App() {
     }
   }, [walletAddress]);
 
-  const fetchAIPredictions = useCallback(async (statusArg = 'pending') => {
-    const fetchKey = `ai-${statusArg}`;
+  const fetchAIPredictions = useCallback(async () => {
+    const fetchKey = 'ai-all-tiers';
     if (fetchingRef.current[fetchKey]) return;
     fetchingRef.current[fetchKey] = true;
 
     setAILoading(true);
     try {
-      const limit = statusArg === 'resolved' ? 50 : 20;
-      const resp = await fetch(`${API}/api/predictions/ai?limit=${limit}&status=${statusArg}`);
+      const resp = await fetch(`${API}/api/predictions/ai`);
       if (resp.ok) {
-        const data = await resp.json();
-        setAIPredictions(data.predictions || []);
+        const json = await resp.json();
+        if (json.status === 'success' && json.data) {
+          setAITiers({
+            todays_predictions: json.data.todays_predictions || [],
+            old_predictions: json.data.old_predictions || [],
+            expired_predictions: json.data.expired_predictions || []
+          });
+        }
       }
     } catch (err) {
       console.error("Failed to fetch AI predictions", err);
@@ -338,7 +351,7 @@ function App() {
       fetchMarkets(1, search, category, source, sortBy);
     }
     if (currentView === 'oracle' || currentView === 'markets') {
-      fetchAIPredictions(oracleStatus);
+      fetchAIPredictions();
       fetchAIMisses();
     }
     if (currentView === 'daily') {
@@ -494,14 +507,14 @@ function App() {
                 <p>Verify insights from the Homer Baba Oracle and trade global markets.</p>
               </section>
 
-              {aiPredictions.length > 0 && (
+              {aiTiers.todays_predictions.length > 0 && (
                 <section className="featured-section oracle-glow">
                   <div className="featured-header">
                     <h2>Homer's Top Picks 🔮</h2>
                     <button className="view-all-btn" onClick={() => setCurrentView('oracle')}>View All Insights →</button>
                   </div>
                   <div className="featured-grid">
-                    {aiPredictions.slice(0, 3).map(p => (
+                    {aiTiers.todays_predictions.slice(0, 3).map((p: any) => (
                       <div key={p.id} className="featured-card glass-effect" onClick={() => handleMarketClick(p.market as any)}>
                         <div className="card-badge">HIGH CONFIDENCE {p.confidence}%</div>
                         <div className="featured-card-image">
@@ -686,13 +699,13 @@ function App() {
 
           {currentView === 'oracle' && (
             <OracleView
-              predictions={aiPredictions}
+              todaysPredictions={aiTiers.todays_predictions}
+              oldPredictions={aiTiers.old_predictions}
+              expiredPredictions={aiTiers.expired_predictions}
               misses={aiMisses}
               stats={dailyScoreboard}
               loading={aiLoading}
               onMarketClick={handleMarketClick}
-              oracleStatus={oracleStatus}
-              setOracleStatus={setOracleStatus}
             />
           )}
         </ErrorBoundary>
