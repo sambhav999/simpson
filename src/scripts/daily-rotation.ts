@@ -68,7 +68,7 @@ async function rotateAIOracle() {
             resolved: false,
             OR: [
                 { closesAt: { gt: now } },
-                { AND: [{ closesAt: null }, { expiry: { gt: now } }] }
+                { expiry: { gt: now } }
             ],
             aiPredictions: { none: {} },
             dailyBattleMarkets: { none: {} }
@@ -135,7 +135,7 @@ async function rotateDailyBattle() {
             resolved: false,
             OR: [
                 { closesAt: { gt: now } },
-                { AND: [{ closesAt: null }, { expiry: { gt: now } }] }
+                { expiry: { gt: now } }
             ],
             id: { notIn: existingMarketIds },
             aiPredictions: { none: {} }
