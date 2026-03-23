@@ -19,36 +19,40 @@ async function main() {
         return;
     }
     
-    const excess = kalshiCount - targetTotal;
-    console.log(`Found ${excess} excess Kalshi markets. Pruning...`);
+    let currentKalshiCount = kalshiCount;
+    const BATCH_SIZE = 5000;
+    let totalDeleted = 0;
     
-    // Find the threshold ID for the 35,000 most recent ones
-    // We order by id descending (newest first) and skip the first 35,000.
-    // The next one is the newest market that should be deleted.
-    const thresholdMarket = await prisma.market.findFirst({
-        where: { source: 'kalshi' },
-        orderBy: { id: 'desc' },
-        skip: 35000,
-        select: { id: true }
-    });
+    console.log(`Starting batch pruning of ${excess} markets...`);
     
-    if (!thresholdMarket) {
-        console.log('No markets found to prune after skipping 35,000.');
-        return;
+    while (currentKalshiCount > targetTotal) {
+        const toDeleteCount = Math.min(BATCH_SIZE, currentKalshiCount - targetTotal);
+        
+        // Find the oldest markets in this batch
+        const batchToPrune = await prisma.market.findMany({
+            where: { source: 'kalshi' },
+            orderBy: { id: 'asc' },
+            select: { id: true },
+            take: toDeleteCount
+        });
+        
+        if (batchToPrune.length === 0) break;
+        
+        const ids = batchToPrune.map(m => m.id);
+        const result = await prisma.market.deleteMany({
+            where: { id: { in: ids } }
+        });
+        
+        totalDeleted += result.count;
+        currentKalshiCount -= result.count;
+        
+        console.log(`Deleted ${result.count} markets. Progress: ${totalDeleted}/${excess} pruned. Current count: ${currentKalshiCount}`);
+        
+        // Brief pause to allow DB to breathe
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
     
-    const thresholdId = thresholdMarket.id;
-    console.log(`Threshold ID for pruning: ${thresholdId}`);
-    
-    // Delete all markets with ID <= thresholdId
-    const result = await prisma.market.deleteMany({
-        where: {
-            source: 'kalshi',
-            id: { lte: thresholdId }
-        }
-    });
-    
-    console.log(`✅ Successfully pruned ${result.count} Kalshi markets.`);
+    console.log(`✅ Successfully pruned ${totalDeleted} Kalshi markets in total.`);
     
     const newCount = await prisma.market.count({
         where: { source: 'kalshi' }
