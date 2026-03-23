@@ -22,32 +22,33 @@ async function main() {
     const excess = kalshiCount - targetTotal;
     console.log(`Found ${excess} excess Kalshi markets. Pruning...`);
     
-    // Find the oldest excess markets by ID
-    const oldestMarkets = await prisma.market.findMany({
+    // Find the threshold ID for the 35,000 most recent ones
+    // We order by id descending (newest first) and skip the first 35,000.
+    // The next one is the newest market that should be deleted.
+    const thresholdMarket = await prisma.market.findFirst({
         where: { source: 'kalshi' },
-        orderBy: { id: 'asc' }, // Use id (ObjectId) which is indexed and contains timestamp
-        select: { id: true },
-        take: excess
+        orderBy: { id: 'desc' },
+        skip: 35000,
+        select: { id: true }
     });
     
-    const marketIdsToDelete = oldestMarkets.map(m => m.id);
-    
-    // Delete in batches to avoid overwhelming the database
-    let deletedCount = 0;
-    const BATCH_SIZE = 10000;
-    
-    for (let i = 0; i < marketIdsToDelete.length; i += BATCH_SIZE) {
-        const batch = marketIdsToDelete.slice(i, i + BATCH_SIZE);
-        const result = await prisma.market.deleteMany({
-            where: {
-                id: { in: batch }
-            }
-        });
-        deletedCount += result.count;
-        console.log(`Deleted ${deletedCount} / ${excess} excess markets...`);
+    if (!thresholdMarket) {
+        console.log('No markets found to prune after skipping 35,000.');
+        return;
     }
     
-    console.log(`✅ Successfully pruned ${deletedCount} Kalshi markets.`);
+    const thresholdId = thresholdMarket.id;
+    console.log(`Threshold ID for pruning: ${thresholdId}`);
+    
+    // Delete all markets with ID <= thresholdId
+    const result = await prisma.market.deleteMany({
+        where: {
+            source: 'kalshi',
+            id: { lte: thresholdId }
+        }
+    });
+    
+    console.log(`✅ Successfully pruned ${result.count} Kalshi markets.`);
     
     const newCount = await prisma.market.count({
         where: { source: 'kalshi' }
