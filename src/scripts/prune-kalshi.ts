@@ -13,6 +13,7 @@ async function main() {
     console.log(`Current Kalshi market count: ${kalshiCount}`);
     
     const targetTotal = 35000;
+    const excess = kalshiCount - targetTotal;
     
     if (kalshiCount <= targetTotal) {
         console.log('No pruning needed. Count is within limits.');
