@@ -440,7 +440,7 @@ function App() {
         setQuote(data.data);
       } else {
         const err = await res.json();
-        setQuoteError(err.message || 'Failed to get quote');
+        setQuoteError(err.error || err.message || 'Failed to get quote');
       }
     } catch (err) {
       setQuoteError('Network error');
