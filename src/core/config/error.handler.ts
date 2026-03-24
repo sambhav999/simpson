@@ -17,6 +17,7 @@ import { ZodError } from 'zod';
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof AppError) {
+    logger.warn(`AppError (${err.statusCode}): ${err.message}`);
     res.status(err.statusCode).json({
       error: err.message,
       status: err.statusCode,
@@ -25,6 +26,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
   }
 
   if (err instanceof ZodError) {
+    logger.warn(`ZodError: ${JSON.stringify(err.flatten().fieldErrors)}`);
     res.status(400).json({
       error: 'Validation Error',
       details: err.flatten().fieldErrors,

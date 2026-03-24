@@ -17,7 +17,6 @@ export default function TradeModal({
     confirming,
     checkBalanceAndConfirm,
     tradeSuccess,
-    setTradeSuccess,
     paymentMethod,
     setPaymentMethod,
     qrUri,
@@ -85,7 +84,7 @@ export default function TradeModal({
                                 ) : (
                                     <div className="qr-container">
                                         <div className="qr-code-wrapper"><QRCodeSVG value={qrUri} size={200} includeMargin={true} /></div>
-                                        <button className="dev-test-btn" onClick={() => setTradeSuccess(true)}>(Simulate Payment)</button>
+                                        {/* (Simulated Payment button removed for Mainnet enforcement) */}
                                     </div>
                                 )}
                             </div>

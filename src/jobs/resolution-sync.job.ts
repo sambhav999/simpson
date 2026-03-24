@@ -6,7 +6,7 @@ import { RedisService } from '../core/config/redis.service';
 
 const QUEUE_NAME = 'resolution-sync';
 const JOB_NAME = 'resolve-markets';
-const REPEAT_INTERVAL_MS = 60 * 60 * 1000; // Every hour
+const REPEAT_INTERVAL_MS = 15 * 60 * 1000; // Every 15 minutes for real-time resolution
 
 export class ResolutionJob {
   private queue: Queue;

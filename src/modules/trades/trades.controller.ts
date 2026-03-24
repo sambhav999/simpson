@@ -1,4 +1,4 @@
-﻿import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { TradesService } from './trades.service';
 import { AppError } from '../../core/config/error.handler';
 export const tradesRouter = Router();
@@ -40,14 +40,19 @@ tradesRouter.post('/', async (req: Request, res: Response, next: NextFunction) =
       return next(new AppError('Missing required trade fields', 400));
     }
 
+    // Lookup market to get correct token mints if not provided
+    const market = await (tradesService as any).prisma.market.findUnique({ where: { id: marketId } });
+    const finalTokenMint = tokenMint || (side === 'YES' ? market?.yesTokenMint : market?.noTokenMint) || 'placeholder_mint';
+
     // Generate a unique simulation signature if not provided
     const signature = `sim_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
 
     const trade = await tradesService.recordTrade({
       walletAddress,
       marketId,
-      tokenMint: tokenMint || 'placeholder_mint',
-      side: side === 'YES' ? 'BUY' : 'BUY', // Assuming opening a position is always a BUY of a specific token
+      tokenMint: finalTokenMint,
+      side: 'BUY',
+      betSide: side, // Explicitly save the YES/NO choice
       price: price || 0.5,
       amount: Number(amount),
       signature,
@@ -128,6 +133,38 @@ tradesRouter.get('/verify', async (req: Request, res: Response, next: NextFuncti
     }
 
     res.json({ status: 'confirmed', signature: signatures[0].signature });
+  } catch (error) {
+    next(error);
+  }
+});
+/**
+ * Record a failed trade (e.g., insufficient funds)
+ */
+tradesRouter.post('/record-failure', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { walletAddress, marketId, side, amount, price, reason } = req.body;
+
+    if (!walletAddress || !marketId || !side) {
+      return next(new AppError('Missing required failure recording fields', 400));
+    }
+
+    const market = await (tradesService as any).prisma.market.findUnique({ where: { id: marketId } });
+    const tokenMint = side === 'YES' ? market?.yesTokenMint : market?.noTokenMint;
+
+    const trade = await tradesService.recordTrade({
+      walletAddress,
+      marketId,
+      tokenMint: tokenMint || 'placeholder_mint',
+      side: 'BUY',
+      betSide: side,
+      price: price || 0,
+      amount: amount || 0,
+      signature: `fail_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      status: `FAILED_${(reason || 'UNKNOWN').toUpperCase().replace(/\s+/g, '_')}`,
+      timestamp: new Date()
+    });
+
+    res.json({ success: true, data: trade });
   } catch (error) {
     next(error);
   }

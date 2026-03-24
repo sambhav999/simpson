@@ -14,7 +14,7 @@ export default function PortfolioView({ walletAddress, onConnectWallet, refreshT
             try {
                 const [portRes, histRes] = await Promise.all([
                     fetch(`${API}/portfolio/${walletAddress}`),
-                    fetch(`${API}/portfolio/${walletAddress}/history?days=10`)
+                    fetch(`${API}/portfolio/${walletAddress}/history?days=365`)
                 ]);
                 if (portRes.ok) setData((await portRes.json()).data);
                 if (histRes.ok) setHistory((await histRes.json()).data || []);
@@ -139,6 +139,14 @@ export default function PortfolioView({ walletAddress, onConnectWallet, refreshT
                                                                 fontWeight: '900'
                                                             }}>
                                                                 {h.result}
+                                                            </span>
+                                                        ) : h.result?.startsWith('FAILED') ? (
+                                                            <span style={{ 
+                                                                color: '#f87171',
+                                                                fontSize: '0.7rem',
+                                                                fontWeight: '900'
+                                                            }}>
+                                                                FAILED
                                                             </span>
                                                         ) : (
                                                             <span style={{ 

@@ -37,6 +37,8 @@ export class MarketsRepository {
       update: {
         title: market.title,
         description: market.description,
+        yesTokenMint: market.yesTokenMint || undefined,
+        noTokenMint: market.noTokenMint || undefined,
         status: market.status,
         expiry: market.expiry ? new Date(market.expiry) : null,
         category: market.category,

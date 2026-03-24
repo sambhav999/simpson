@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react'
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { io } from 'socket.io-client';
 import './App.css';
-import { recordTrade } from './lib/api';
+// import { recordTrade } from './lib/api';
 
 // Components
 import ErrorBoundary from './components/ErrorBoundary';
@@ -36,6 +36,8 @@ interface Market {
   image?: string;
   source?: string;
   question?: string;
+  yesTokenMint?: string;
+  noTokenMint?: string;
 }
 
 interface PaginationInfo {
@@ -97,6 +99,7 @@ function App() {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [currentView, setCurrentView] = useState<'markets' | 'portfolio' | 'leaderboard' | 'daily' | 'oracle'>('markets');
   const [portfolioRefreshTrigger, setPortfolioRefreshTrigger] = useState(0);
+  const [userPositions, setUserPositions] = useState<any[]>([]);
 
   // Daily State
   const [dailyTiers, setDailyTiers] = useState<{
@@ -132,13 +135,72 @@ function App() {
 
 
   // Wallet Adapters integration
-  const { publicKey, select, disconnect, wallets } = useWallet();
+  const { publicKey, select, disconnect, wallets, sendTransaction } = useWallet();
   const { connection } = useConnection();
 
   const [walletBalance, setWalletBalance] = useState<string | null>(null);
   const [showWalletSelector, setShowWalletSelector] = useState(false);
 
   const walletAddress = publicKey ? publicKey.toBase58() : null;
+
+  useEffect(() => {
+    if (walletAddress) {
+      fetchUserPositions();
+    }
+  }, [walletAddress, portfolioRefreshTrigger]);
+
+  const fetchUserPositions = async () => {
+    try {
+      const res = await fetch(`${API}/api/portfolio/${walletAddress}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUserPositions(data.data?.positions || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user positions', err);
+    }
+  };
+
+  const autoLogin = async () => {
+    if (!publicKey) return;
+    const token = localStorage.getItem('auth_token');
+    if (token) return; // Already logged in
+
+    try {
+      console.log('Starting auto-login for', walletAddress);
+      // 1. Get Nonce
+      const nonceRes = await fetch(`${API}/api/auth/nonce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet: walletAddress })
+      });
+      if (!nonceRes.ok) throw new Error('Failed to get nonce');
+      
+      const { nonce } = await nonceRes.json();
+      
+      // 2. "Verify" (MVP skips actual signing check, but we send a dummy signature)
+      const verifyRes = await fetch(`${API}/api/auth/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet: walletAddress, signature: 'signed-by-wallet-' + nonce })
+      });
+      
+      if (verifyRes.ok) {
+        const { token: newToken } = await verifyRes.json();
+        localStorage.setItem('auth_token', newToken);
+        console.log('Auto-login successful');
+        fetchDailyData(); // Refresh daily data with the new token
+      }
+    } catch (err) {
+      console.error('Auto-login failed:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (walletAddress) {
+      autoLogin();
+    }
+  }, [walletAddress]);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchingRef = useRef<Record<string, boolean>>({});
 
@@ -242,8 +304,8 @@ function App() {
 
   const truncateAddress = (addr: string) => `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 
-  const fetchMarkets = useCallback(async (page = 1, searchQuery = '', cat = 'All', src = 'all', sort = '', isAppend = false) => {
-    const fetchKey = `markets-${page}-${searchQuery}-${cat}-${src}-${sort}`;
+  const fetchMarkets = useCallback(async (pageIdx = 1, q = '', cat = 'All', src = 'all', sort = '', isAppend = false) => {
+    const fetchKey = `markets-${pageIdx}-${q}-${cat}-${src}-${sort}`;
     if (fetchingRef.current[fetchKey]) return;
     fetchingRef.current[fetchKey] = true;
 
@@ -251,8 +313,8 @@ function App() {
     else setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ page: String(page), limit: '20', status: 'active' });
-      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      const params = new URLSearchParams({ page: String(pageIdx), limit: '20', status: 'active' });
+      if (q.trim()) params.set('search', q.trim());
       if (cat !== 'All') params.set('category', cat);
       if (src !== 'all') params.set('source', src);
       if (sort) params.set('sort', sort);
@@ -272,8 +334,13 @@ function App() {
         setMarkets(newMarkets);
       }
       setPagination(json.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch markets');
+    } catch (err: any) {
+      console.error('Fetch markets failed:', err);
+      if (err.message === 'Failed to fetch') {
+        setError('Network Connection Error. Please check your internet connection.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch markets');
+      }
       if (!isAppend) setMarkets([]);
     } finally {
       setLoading(false);
@@ -450,25 +517,84 @@ function App() {
   };
 
   const checkBalanceAndConfirm = async () => {
-    if (!publicKey || !selectedMarket || !walletAddress) return;
+    if (!publicKey || !selectedMarket || !walletAddress) {
+      setQuoteError('Wallet not connected');
+      return;
+    }
     setConfirming(true);
     setQuoteError(null);
     try {
-      const res = await recordTrade({
-        walletAddress,
+      // 1. Get a unique reference key for this transaction to track it
+      const { Keypair, Transaction } = await import('@solana/web3.js');
+      const reference = Keypair.generate().publicKey;
+
+      // 2. Fetch the real transaction from the backend
+      const params = new URLSearchParams({
+        reference: reference.toBase58(),
         marketId: selectedMarket.id,
         side,
-        amount: Number(amount),
-        price: quote?.price || 0.5,
+        amount
+      });
+      
+      const res = await fetch(`${API}/trade/pay?${params}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account: walletAddress })
       });
 
-      if (res.success) {
-        setTradeSuccess(true);
-      } else {
-        setQuoteError('Failed to record trade on server');
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to build transaction');
       }
-    } catch (err) {
-      setQuoteError(err instanceof Error ? err.message : 'Trade failed');
+
+      const { transaction: base64Tx } = await res.json();
+
+      // 3. Deserialize and sign transaction
+      const transaction = Transaction.from(Buffer.from(base64Tx, 'base64'));
+      
+      const signature = await sendTransaction(transaction, connection);
+      
+      // 4. Wait for confirmation
+      const latestBlockhash = await connection.getLatestBlockhash();
+      await connection.confirmTransaction({
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+      });
+
+      setTradeSuccess(true);
+      setPortfolioRefreshTrigger(prev => prev + 1);
+    } catch (err: any) {
+      console.error('Trade execution failed:', err);
+      let errorMessage = err.message || 'Transaction failed or cancelled';
+      
+      if (errorMessage.toLowerCase().includes('insufficient funds') || 
+          errorMessage.toLowerCase().includes('insufficient balance')) {
+        errorMessage = 'Transaction failed due to insufficient funds';
+        
+        // Record failure in history
+        try {
+          await fetch(`${API}/trade/record-failure`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              walletAddress,
+              marketId: selectedMarket.id,
+              side,
+              amount: Number(amount),
+              price: quote?.price || 0,
+              reason: 'insufficient_funds'
+            })
+          });
+          setPortfolioRefreshTrigger(prev => prev + 1);
+        } catch (failErr) {
+          console.error('Failed to log trade failure:', failErr);
+        }
+      } else if (errorMessage.toLowerCase().includes('disconnected port')) {
+        errorMessage = 'Wallet connection lost. Please refresh the page and try again.';
+      }
+      
+      setQuoteError(errorMessage);
     } finally {
       setConfirming(false);
     }
@@ -649,31 +775,51 @@ function App() {
               ) : (
                 <>
                   <div className="markets-grid">
-                    {markets.map(m => (
-                      <div key={m.id} className="market-card glass-effect" onClick={() => handleMarketClick(m)}>
-                        <div className="market-image-container">
-                          {m.image ? (
-                            <img 
-                              src={m.image} 
-                              alt={m.title || m.question}
-                              loading="lazy"
-                              className="market-image-img"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('image-fallback'); }}
-                            />
-                          ) : (
-                            <div className="image-fallback" style={{ width: '100%', height: '100%' }} />
-                          )}
-                          <div className="source-tag">{m.source}</div>
-                        </div>
-                        <div className="market-card-content">
-                          <h3>{m.title || m.question}</h3>
-                          <div className="market-card-footer">
-                            <span className="category-tag">{m.category}</span>
-                            <button className="trade-btn">Trade</button>
+                    {markets.map(m => {
+                      const position = userPositions.find(p => p.marketId === m.id);
+                      const myBet = position?.betSide || (position?.tokenMint === m.yesTokenMint ? 'YES' : 'NO');
+                      
+                      return (
+                        <div key={m.id} className="market-card glass-effect" onClick={() => handleMarketClick(m)}>
+                          <div className="market-image-container">
+                            {m.image ? (
+                              <img 
+                                src={m.image} 
+                                alt={m.title || m.question}
+                                loading="lazy"
+                                className="market-image-img"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('image-fallback'); }}
+                              />
+                            ) : (
+                              <div className="image-fallback" style={{ width: '100%', height: '100%' }} />
+                            )}
+                            <div className="source-tag">{m.source}</div>
+                            {position && (
+                              <div className={`user-bet-tag ${myBet.toLowerCase()}`}>
+                                YOUR BET: {myBet}
+                              </div>
+                            )}
+                          </div>
+                          <div className="market-card-content">
+                            <h3>{m.title || m.question}</h3>
+                            <div className="market-card-footer">
+                              <span className="category-tag">{m.category}</span>
+                              <button 
+                                className="trade-btn" 
+                                disabled={!!position}
+                                style={{ 
+                                  opacity: position ? 0.6 : 1, 
+                                  cursor: position ? 'not-allowed' : 'pointer',
+                                  background: position ? 'var(--bg-card)' : ''
+                                }}
+                              >
+                                {position ? 'Position Held' : 'Trade'}
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {loadingMore && (
@@ -711,6 +857,7 @@ function App() {
               fetchDailyData={fetchDailyData}
               walletAddress={walletAddress}
               setShowWalletSelector={setShowWalletSelector}
+              userPositions={userPositions}
             />
           )}
 
@@ -723,6 +870,7 @@ function App() {
               stats={dailyScoreboard}
               loading={aiLoading}
               onMarketClick={handleMarketClick}
+              userPositions={userPositions}
             />
           )}
         </ErrorBoundary>
@@ -764,7 +912,6 @@ function App() {
           confirming={confirming}
           checkBalanceAndConfirm={checkBalanceAndConfirm}
           tradeSuccess={tradeSuccess}
-          setTradeSuccess={setTradeSuccess}
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           qrUri={qrUri}

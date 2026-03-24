@@ -59,7 +59,10 @@ export class AuthService {
         // Upsert user
         const user = await this.prisma.user.upsert({
             where: { walletAddress: wallet },
-            create: { walletAddress: wallet },
+            create: { 
+                walletAddress: wallet,
+                username: `user_${wallet.slice(-6).toLowerCase()}`
+            },
             update: {},
         });
 

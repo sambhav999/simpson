@@ -44,7 +44,10 @@ export class PortfolioService {
     if (cached) return JSON.parse(cached);
     await this.prisma.user.upsert({
       where: { walletAddress },
-      create: { walletAddress },
+      create: { 
+        walletAddress,
+        username: `user_${walletAddress.slice(-6).toLowerCase()}`
+      },
       update: {},
     });
     const positions = await this.prisma.position.findMany({
@@ -54,7 +57,7 @@ export class PortfolioService {
     const portfolioPositions: PortfolioPosition[] = positions
       .filter((p) => p.amount > 0)
       .map((p) => {
-        const side = p.market.yesTokenMint === p.tokenMint ? 'YES' : 'NO';
+        const side = (p as any).betSide || (p.market.yesTokenMint === p.tokenMint ? 'YES' : 'NO');
         const currentValue = p.amount * p.averageEntryPrice;
         const unrealizedPnl = 0;
         return {
@@ -112,7 +115,7 @@ export class PortfolioService {
         this.prisma.trade.findMany({
           where: { walletAddress, timestamp: { gte: targetDate } },
           orderBy: { timestamp: 'desc' },
-          take: 150, // safety limit
+          take: 500, // safety limit increased for "every event"
           include: { market: { select: { title: true, yesTokenMint: true, noTokenMint: true, image: true, category: true, resolved: true, resolution: true } } },
         }),
         this.prisma.xPTransaction.findMany({
@@ -131,8 +134,10 @@ export class PortfolioService {
       
       trades.forEach(t => {
         let result = 'PENDING';
-        if (t.market.resolved) {
-          const side = t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO';
+        const side = (t as any).betSide || (t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO');
+        if ((t as any).status && (t as any).status !== 'SUCCESS') {
+          result = (t as any).status;
+        } else if (t.market.resolved) {
           result = t.market.resolution === side ? 'WIN' : 'LOSS';
         }
 
@@ -141,7 +146,7 @@ export class PortfolioService {
           id: t.id,
           marketTitle: t.market.title,
           marketImage: (t.market as any).image,
-          tokenSide: t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO',
+          tokenSide: (t as any).betSide || (t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO'),
           amount: t.amount,
           price: t.price,
           signature: t.signature,
@@ -201,7 +206,7 @@ export class PortfolioService {
         marketTitle: t.market.title,
         marketImage: (t.market as any).image,
         marketCategory: (t.market as any).category,
-        tokenSide: t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO',
+        tokenSide: (t as any).betSide || (t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO'),
       })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
@@ -241,8 +246,14 @@ export class PortfolioService {
                 tokenMint,
                 amount: uiAmount,
                 averageEntryPrice: 0,
+                side: label,
+                betSide: label as any,
               },
-              update: { amount: uiAmount },
+              update: { 
+                amount: uiAmount,
+                side: label,
+                betSide: label as any,
+              },
             });
           }
         }

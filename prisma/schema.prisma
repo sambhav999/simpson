@@ -94,6 +94,7 @@ model Position {
   entryOdds         Float?   @map("entry_odds")
   predictedAt       DateTime @default(now()) @map("predicted_at")
   side              String?
+  betSide           String?  @map("bet_side")
   status            String   @default("ACTIVE")
   market            Market   @relation(fields: [marketId], references: [id])
   user              User     @relation(fields: [walletAddress], references: [walletAddress])
@@ -111,10 +112,12 @@ model Trade {
   marketId      String   @map("market_id") @db.ObjectId
   tokenMint     String   @map("token_mint")
   side          String
+  betSide       String?  @map("bet_side")
   price         Float
   amount        Float
   fee           Float    @default(0)
-  signature     String   @unique
+  status        String   @default("SUCCESS")
+  signature     String?  @unique
   timestamp     DateTime
   createdAt     DateTime @default(now()) @map("created_at")
   market        Market   @relation(fields: [marketId], references: [id])

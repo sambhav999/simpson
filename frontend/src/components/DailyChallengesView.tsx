@@ -15,7 +15,8 @@ export default function DailyChallengesView({
     setSubmittingDaily,
     fetchDailyData,
     walletAddress,
-    setShowWalletSelector
+    setShowWalletSelector,
+    userPositions = []
 }: any) {
 
     const handlePrediction = (marketId: string, prediction: 'YES' | 'NO') => {
@@ -76,6 +77,9 @@ export default function DailyChallengesView({
             ? (typeof m.user_prediction === 'object' ? m.user_prediction.prediction : m.user_prediction) 
             : userPredictions[m.id];
         
+        const position = userPositions.find((p: any) => p.marketId === m.market.id);
+        const onChainBet = position?.betSide || (position?.tokenMint === m.market.yesTokenMint ? 'YES' : 'NO');
+        
         const myResult = hasPrediction && typeof m.user_prediction === 'object' ? m.user_prediction.result : null;
 
         return (
@@ -104,6 +108,19 @@ export default function DailyChallengesView({
                                 marginLeft: '1rem'
                             }}>
                                 {myResult === 'WIN' ? 'YOU WON' : (myResult === 'LOSS' ? 'YOU LOST' : 'PENDING')}
+                            </span>
+                        )}
+                        {position && (
+                            <span style={{ 
+                                padding: '4px 12px', 
+                                borderRadius: '20px', 
+                                fontSize: '0.65rem', 
+                                fontWeight: 'bold',
+                                background: 'rgba(255,255,255,0.05)',
+                                color: onChainBet === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)',
+                                border: '1px solid currentColor'
+                            }}>
+                                YOUR BET: {onChainBet}
                             </span>
                         )}
                     </div>

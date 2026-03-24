@@ -102,3 +102,33 @@ body {
   backdrop-filter: blur(20px);
   border: 1px solid rgba(124, 58, 237, 0.15);
 }
+.user-bet-tag {
+  position: absolute;
+  bottom: 0.8rem;
+  left: 0.8rem;
+  background: rgba(15, 15, 26, 0.85);
+  padding: 0.3rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 900;
+  backdrop-filter: blur(4px);
+  z-index: 10;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.user-bet-tag::before {
+  content: "●";
+  font-size: 0.8rem;
+}
+.user-bet-tag.yes {
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+.user-bet-tag.no {
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}

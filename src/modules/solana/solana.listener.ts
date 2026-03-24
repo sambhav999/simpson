@@ -198,7 +198,10 @@ export class SolanaListener {
       if (!market) return;
       await this.prisma.user.upsert({
         where: { walletAddress: owner },
-        create: { walletAddress: owner },
+        create: { 
+          walletAddress: owner,
+          username: `user_${owner.slice(-6).toLowerCase()}`
+        },
         update: {},
       });
       const mintInfo = await this.solana.getMintInfo(mint);
@@ -218,9 +221,13 @@ export class SolanaListener {
           tokenMint: mint,
           amount: uiAmount,
           averageEntryPrice: 0,
+          side: mint === market.yesTokenMint ? 'YES' : 'NO',
+          betSide: (mint === market.yesTokenMint ? 'YES' : 'NO') as any,
         },
         update: {
           amount: uiAmount,
+          side: mint === market.yesTokenMint ? 'YES' : 'NO',
+          betSide: (mint === market.yesTokenMint ? 'YES' : 'NO') as any,
         },
       });
 
@@ -280,12 +287,15 @@ export class SolanaListener {
               marketId: marketInfo.marketId,
               tokenMint: transfer.tokenMint,
               side,
+              betSide: marketInfo.side as any,
               price: 0,
               amount: transfer.amount,
               signature: sigInfo.signature,
               timestamp: transfer.timestamp,
             },
-            update: {},
+            update: {
+              betSide: marketInfo.side as any,
+            },
           });
           logger.debug(`Indexed trade ${sigInfo.signature} for ${walletAddress}`);
         }

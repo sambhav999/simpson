@@ -155,13 +155,21 @@ export class TradesService {
     amount: number;
     signature: string;
     timestamp: Date;
+    betSide?: string;
+    status?: string;
   }) {
-    const exists = await this.prisma.trade.findUnique({
-      where: { signature: data.signature },
-    });
-    if (exists) {
-      logger.debug(`Trade ${data.signature} already indexed`);
-      return exists;
+    if (data.signature) {
+      const exists = await this.prisma.trade.findUnique({
+        where: { signature: data.signature },
+      });
+      if (exists) {
+        logger.debug(`Trade ${data.signature} already indexed`);
+        return exists;
+      }
+    }
+    const isMainnet = process.env.SOLANA_NETWORK === 'mainnet-beta';
+    if (isMainnet && data.signature.startsWith('sim_')) {
+      throw new AppError('Simulated trades are not allowed on Mainnet-Beta', 403);
     }
 
     // Double check single-bet constraint at recording time
@@ -176,7 +184,10 @@ export class TradesService {
     }
     const user = await this.prisma.user.upsert({
       where: { walletAddress: data.walletAddress },
-      create: { walletAddress: data.walletAddress },
+      create: { 
+        walletAddress: data.walletAddress,
+        username: `user_${data.walletAddress.slice(-6).toLowerCase()}`
+      },
       update: {},
     });
 
@@ -215,15 +226,28 @@ export class TradesService {
       }
     });
 
+    // Resolve tokenMint from market if it's placeholder
+    let finalTokenMint = data.tokenMint;
+    if (finalTokenMint === 'placeholder_mint') {
+      const market = await this.prisma.market.findUnique({ where: { id: data.marketId } });
+      if (market) {
+        // If data.side contains 'YES' or 'NO' (from some calls) or if we have a way to know
+        // For now, let's assume we need to pass the real mint or resolve it.
+        // I'll update the controller to pass the real mint instead.
+      }
+    }
+
     const trade = await this.prisma.trade.create({
       data: {
         walletAddress: data.walletAddress,
         marketId: data.marketId,
         tokenMint: data.tokenMint,
         side: data.side,
+        betSide: data.betSide,
         price: data.price,
         amount: data.amount,
         signature: data.signature,
+        status: data.status || 'SUCCESS',
         timestamp: data.timestamp,
       },
     });
@@ -242,6 +266,7 @@ export class TradesService {
     side: string;
     price: number;
     amount: number;
+    betSide?: string;
   }) {
     const existing = await this.prisma.position.findUnique({
       where: {
@@ -253,6 +278,9 @@ export class TradesService {
       },
     });
     if (data.side === 'BUY') {
+      const market = await this.prisma.market.findUnique({ where: { id: data.marketId } });
+      const side = data.betSide || (data.tokenMint === market?.yesTokenMint ? 'YES' : 'NO');
+
       const newAmount = (existing?.amount || 0) + data.amount;
       const totalCost =
         (existing?.amount || 0) * (existing?.averageEntryPrice || 0) +
@@ -272,10 +300,14 @@ export class TradesService {
           tokenMint: data.tokenMint,
           amount: newAmount,
           averageEntryPrice: newAvgPrice,
+          side: side,
+          betSide: side,
         },
         update: {
           amount: newAmount,
           averageEntryPrice: newAvgPrice,
+          side: side,
+          betSide: side,
         },
       });
     } else if (data.side === 'SELL' && existing) {

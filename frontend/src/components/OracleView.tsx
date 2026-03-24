@@ -8,6 +8,7 @@ interface OracleViewProps {
     stats: any;
     loading: boolean;
     onMarketClick: (market: any) => void;
+    userPositions?: any[];
 }
 
 export default function OracleView({ 
@@ -17,58 +18,84 @@ export default function OracleView({
     misses, 
     stats, 
     loading, 
-    onMarketClick 
+    onMarketClick,
+    userPositions = []
 }: OracleViewProps) {
     const accuracy = stats?.all_time?.homer_baba?.accuracy ? (stats.all_time.homer_baba.accuracy * 100).toFixed(1) : '0.0';
 
-    const renderPredictionCard = (p: any, isExpired = false) => (
-        <div 
-            key={p.id} 
-            className={`daily-card ${isExpired ? 'glass-effect' : 'aura-border'}`} 
-            style={{ padding: '1.5rem', cursor: 'pointer', opacity: isExpired ? 0.8 : 1 }} 
-            onClick={() => onMarketClick(p.market)}
-        >
-            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
-                <div 
-                    className="oracle-market-img" 
-                    style={{ 
-                        backgroundImage: `url(${p.market?.image || ''})`,
-                        filter: isExpired ? 'grayscale(0.5)' : 'none'
-                    }}
-                ></div>
-                <div style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)'}`, textAlign: 'center', minWidth: '80px' }}>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)' }}>{p.prediction}</div>
-                </div>
-                <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: isExpired ? 'var(--text-muted)' : 'var(--accent-purple)', fontWeight: 'bold' }}>
-                            {isExpired ? 'RESOLVED' : `${p.confidence}% CONFIDENCE`}
-                        </span>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            {new Date(p.created_at || p.createdAt).toLocaleDateString()}
-                        </span>
-                    </div>
-                    <h3 style={{ margin: '0.5rem 0' }}>{p.market?.question || p.market?.title}</h3>
-                    <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                        "{p.summary_commentary || p.commentary || 'The oracle is weighing the signals...'}"
-                    </p>
-                    
-                    {!isExpired && (p.bullish_commentary || p.bearish_commentary) && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-                            <div style={{ background: 'rgba(175,82,222,0.05)', padding: '0.8rem', borderRadius: '8px', borderLeft: '3px solid var(--accent-purple)' }}>
-                                <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--accent-purple)', marginBottom: '0.3rem' }}>THE BULL CASE</div>
-                                <div style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>{p.bullish_commentary || "Oracle synthesis suggests hidden upside potential."}</div>
-                            </div>
-                            <div style={{ background: 'rgba(0,122,255,0.05)', padding: '0.8rem', borderRadius: '8px', borderLeft: '3px solid var(--accent-blue)' }}>
-                                <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--accent-blue)', marginBottom: '0.3rem' }}>THE BEAR CASE</div>
-                                <div style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>{p.bearish_commentary || "Entropy in the data stream indicates downside risk."}</div>
-                            </div>
+    const renderPredictionCard = (p: any, isExpired = false) => {
+        const position = userPositions.find((pos: any) => pos.marketId === p.market?.id);
+        const myBet = position?.betSide || (position?.tokenMint === p.market?.yesTokenMint ? 'YES' : 'NO');
+
+        return (
+            <div 
+                key={p.id} 
+                className={`daily-card ${isExpired ? 'glass-effect' : 'aura-border'}`} 
+                style={{ padding: '1.5rem', cursor: 'pointer', opacity: isExpired ? 0.8 : 1 }} 
+                onClick={() => onMarketClick(p.market)}
+            >
+                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+                    <div 
+                        className="oracle-market-img" 
+                        style={{ 
+                            backgroundImage: `url(${p.market?.image || ''})`,
+                            filter: isExpired ? 'grayscale(0.5)' : 'none'
+                        }}
+                    ></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '80px' }}>
+                        <div style={{ 
+                            padding: '10px', 
+                            borderRadius: '8px', 
+                            border: `1px solid ${p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)'}`, 
+                            textAlign: 'center' 
+                        }}>
+                            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginBottom: '2px' }}>ORACLE</div>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: p.prediction === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)' }}>{p.prediction}</div>
                         </div>
-                    )}
+                        {position && (
+                            <div style={{ 
+                                padding: '4px', 
+                                borderRadius: '4px', 
+                                border: `1px solid ${myBet === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)'}`, 
+                                textAlign: 'center',
+                                background: 'rgba(255,255,255,0.03)'
+                            }}>
+                                <div style={{ fontSize: '0.5rem', color: 'var(--text-muted)' }}>MY BET</div>
+                                <div style={{ fontSize: '0.8rem', fontWeight: '900', color: myBet === 'YES' ? 'var(--accent-green)' : 'var(--accent-red)' }}>{myBet}</div>
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: isExpired ? 'var(--text-muted)' : 'var(--accent-purple)', fontWeight: 'bold' }}>
+                                {isExpired ? 'RESOLVED' : `${p.confidence}% CONFIDENCE`}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                {new Date(p.created_at || p.createdAt).toLocaleDateString()}
+                            </span>
+                        </div>
+                        <h3 style={{ margin: '0.5rem 0' }}>{p.market?.question || p.market?.title}</h3>
+                        <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                            "{p.summary_commentary || p.commentary || 'The oracle is weighing the signals...'}"
+                        </p>
+                        
+                        {!isExpired && (p.bullish_commentary || p.bearish_commentary) && (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+                                <div style={{ background: 'rgba(175,82,222,0.05)', padding: '0.8rem', borderRadius: '8px', borderLeft: '3px solid var(--accent-purple)' }}>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--accent-purple)', marginBottom: '0.3rem' }}>THE BULL CASE</div>
+                                    <div style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>{p.bullish_commentary || "Oracle synthesis suggests hidden upside potential."}</div>
+                                </div>
+                                <div style={{ background: 'rgba(0,122,255,0.05)', padding: '0.8rem', borderRadius: '8px', borderLeft: '3px solid var(--accent-blue)' }}>
+                                    <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--accent-blue)', marginBottom: '0.3rem' }}>THE BEAR CASE</div>
+                                    <div style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>{p.bearish_commentary || "Entropy in the data stream indicates downside risk."}</div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <main className="main-content">

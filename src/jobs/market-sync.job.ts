@@ -4,7 +4,7 @@ import { logger } from '../core/logger/logger';
 import { RedisService } from '../core/config/redis.service';
 const QUEUE_NAME = 'market-sync';
 const JOB_NAME = 'sync-markets';
-const REPEAT_INTERVAL_MS = 600_000; // 10 minutes (increased for 2-core stability)
+const REPEAT_INTERVAL_MS = 300_000; // 5 minutes for real-time responsiveness
 export class MarketSyncJob {
   private queue: Queue;
   private worker: Worker;
