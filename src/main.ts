@@ -8,6 +8,7 @@ import { PortfolioSyncJob } from './jobs/portfolio-sync.job';
 import { FeeReconciliationJob } from './jobs/fee-reconciliation.job';
 import { OracleSyncJob } from './jobs/oracle-sync.job';
 import { ResolutionJob } from './jobs/resolution-sync.job';
+import { DailyRotationJob } from './jobs/daily-rotation.job';
 import { SolanaListener } from './modules/solana/solana.listener';
 import { buildApp } from './app';
 import { SocketService } from './core/socket/socket.service';
@@ -35,6 +36,7 @@ async function bootstrap() {
   const feeReconciliationJob = new FeeReconciliationJob();
   const oracleSyncJob = new OracleSyncJob();
   const resolutionJob = new ResolutionJob();
+  const dailyRotationJob = new DailyRotationJob();
   const solanaListener = new SolanaListener();
   const isInstance0 = process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE;
 
@@ -44,6 +46,7 @@ async function bootstrap() {
     await feeReconciliationJob.start();
     await oracleSyncJob.start();
     await resolutionJob.start();
+    await dailyRotationJob.start();
     await solanaListener.start();
     logger.info('Background jobs and listeners started (Instance 0)');
   } else {
@@ -60,6 +63,7 @@ async function bootstrap() {
     await feeReconciliationJob.stop();
     await oracleSyncJob.stop();
     await resolutionJob.stop();
+    await dailyRotationJob.stop();
     await solanaListener.stop();
     externalStreamsService.stop();
     await prisma.$disconnect();

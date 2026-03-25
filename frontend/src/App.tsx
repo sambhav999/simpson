@@ -151,7 +151,7 @@ function App() {
 
   const fetchUserPositions = async () => {
     try {
-      const res = await fetch(`${API}/api/portfolio/${walletAddress}`);
+      const res = await fetch(`${API}/portfolio/${walletAddress}`);
       if (res.ok) {
         const data = await res.json();
         setUserPositions(data.data?.positions || []);
