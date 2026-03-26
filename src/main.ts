@@ -29,8 +29,6 @@ async function bootstrap() {
   socketService.init(server);
 
   const externalStreamsService = new ExternalStreamsService();
-  externalStreamsService.start();
-
   const marketSyncJob = new MarketSyncJob();
   const portfolioSyncJob = new PortfolioSyncJob();
   const feeReconciliationJob = new FeeReconciliationJob();
@@ -46,13 +44,14 @@ async function bootstrap() {
   });
 
   if (isInstance0) {
-    marketSyncJob.start().catch(err => logger.error('MarketSyncJob failed to start', err));
-    portfolioSyncJob.start().catch(err => logger.error('PortfolioSyncJob failed to start', err));
-    feeReconciliationJob.start().catch(err => logger.error('FeeReconciliationJob failed to start', err));
-    oracleSyncJob.start().catch(err => logger.error('OracleSyncJob failed to start', err));
-    resolutionJob.start().catch(err => logger.error('ResolutionJob failed to start', err));
-    dailyRotationJob.start().catch(err => logger.error('DailyRotationJob failed to start', err));
-    solanaListener.start().catch(err => logger.error('SolanaListener failed to start', err));
+    externalStreamsService.start();
+    marketSyncJob.start().catch((err: any) => logger.error('MarketSyncJob failed to start', err));
+    portfolioSyncJob.start().catch((err: any) => logger.error('PortfolioSyncJob failed to start', err));
+    feeReconciliationJob.start().catch((err: any) => logger.error('FeeReconciliationJob failed to start', err));
+    oracleSyncJob.start().catch((err: any) => logger.error('OracleSyncJob failed to start', err));
+    resolutionJob.start().catch((err: any) => logger.error('ResolutionJob failed to start', err));
+    dailyRotationJob.start().catch((err: any) => logger.error('DailyRotationJob failed to start', err));
+    solanaListener.start().catch((err: any) => logger.error('SolanaListener failed to start', err));
     logger.info('Background jobs and listeners initiated (Instance 0)');
   } else {
     logger.info(`API Instance ${process.env.NODE_APP_INSTANCE} started (Jobs disabled)`);
