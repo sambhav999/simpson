@@ -164,7 +164,8 @@ function App() {
   const autoLogin = async () => {
     if (!publicKey) return;
     const token = localStorage.getItem('auth_token');
-    if (token) return; // Already logged in
+    // If token exists, we're good unless it's explicitly cleared by a 401
+    if (token) return; 
 
     try {
       console.log('Starting auto-login for', walletAddress);
@@ -297,6 +298,7 @@ function App() {
   const disconnectWallet = async () => {
     try {
       await disconnect();
+      localStorage.removeItem('auth_token');
     } catch (err) {
       console.error('Disconnect failed:', err);
     }
@@ -376,7 +378,15 @@ function App() {
         }
       }
       if (scoreboardRes && scoreboardRes.ok) setDailyScoreboard(await scoreboardRes.json());
-      if (userStatsRes && userStatsRes.ok) setDailyUserStats(await userStatsRes.json());
+      
+      if (userStatsRes) {
+        if (userStatsRes.status === 401) {
+          console.warn('Token expired, clearing auth_token');
+          localStorage.removeItem('auth_token');
+        } else if (userStatsRes.ok) {
+          setDailyUserStats(await userStatsRes.json());
+        }
+      }
 
       const leaderRes = await fetch(`${API}/api/daily/leaderboard?limit=10`);
       if (leaderRes.ok) {
