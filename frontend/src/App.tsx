@@ -14,6 +14,7 @@ const DailyChallengesView = lazy(() => import('./components/DailyChallengesView'
 const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
 const TradeModal = lazy(() => import('./components/TradeModal'));
 import SkeletonCard from './components/SkeletonCard';
+const ChatAssistant = lazy(() => import('./components/ChatAssistant'));
 
 const API = import.meta.env.VITE_BACKEND_URL;
 const socket = io(API, { transports: ['websocket'] });
@@ -927,6 +928,9 @@ function App() {
           qrUri={qrUri}
           onTradeSuccess={() => setPortfolioRefreshTrigger(prev => prev + 1)}
         />
+      </Suspense>
+      <Suspense fallback={null}>
+        <ChatAssistant />
       </Suspense>
     </div>
   );

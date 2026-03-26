@@ -22,6 +22,7 @@ import { socialRouter } from './modules/social/social.controller';
 import { creatorsRouter } from './modules/creators/creators.controller';
 import { cardsRouter } from './modules/cards/cards.controller';
 import { dailyRouter } from './modules/daily/daily.controller';
+import { assistantRouter } from './modules/assistant/assistant.controller';
 import { errorHandler } from './core/config/error.handler';
 
 export function buildApp() {
@@ -84,6 +85,7 @@ export function buildApp() {
     app.use('/api/creators', creatorsRouter);
     app.use('/api/cards', cardsRouter);
     app.use('/api/daily', dailyRouter);
+    app.use('/api/assistant', assistantRouter);
 
     app.use(errorHandler);
 
