@@ -43,5 +43,20 @@ export const KNOWLEDGE_BASE = [
     intent: 'tech_stack',
     keywords: ['tech stack', 'technology', 'how it works', 'prisma', 'node', 'solana', 'react'],
     answer: "SimPredict is built with a modern stack: Node.js/Express and Prisma (PostgreSQL) on the backend, React 18/Vite on the frontend, and Solana for non-custodial trading. It uses Redis for caching and BullMQ for background jobs."
+  },
+  {
+    intent: 'ui_navigation_predictions',
+    keywords: ['how to see todays predictions', 'where are predictions', 'show predictions', 'see predictions'],
+    answer: "To see today's predictions, click on the 'AI Oracle 🔮' tab in the top navigation bar. You'll find Homer Baba's latest picks, confidence scores, and detailed commentary there!"
+  },
+  {
+    intent: 'ui_navigation_challenges',
+    keywords: ['show me todays challenge', 'where is the challenge', 'daily battle ui', 'how to play'],
+    answer: "You can find today's challenges in the 'Daily' tab. It shows the active Battle, your current progress, and the global leaderboard for the day!"
+  },
+  {
+    intent: 'ui_navigation_portfolio',
+    keywords: ['where is my portfolio', 'see my trades', 'my stats'],
+    answer: "Click on the 'Portfolio' tab or your wallet address in the top right to see your active positions, trade history, and overall performance stats."
   }
 ];
