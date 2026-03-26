@@ -10,7 +10,7 @@ const predictionsService = new PredictionsService();
 router.get('/ai', async (req: Request, res: Response, next: NextFunction) => {
     try {
         const data = await predictionsService.getAIPredictions();
-        res.json(data);
+        res.json({ status: 'success', data });
     } catch (err) {
         next(err);
     }
