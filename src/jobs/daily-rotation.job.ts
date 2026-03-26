@@ -78,20 +78,14 @@ export class DailyRotationJob {
         });
         logger.info(`Cleaned up ${cleanupResult.count} featured predictions.`);
 
-        // 2. Increment ranks of existing featured predictions
+        // 2. Demote ALL current featured predictions to 'Old' status
         await this.prisma.aIPrediction.updateMany({
             where: { featured: true },
-            data: { featuredRank: { increment: 10 } }
-        });
-
-        // 3. Demote those that fell out of the top 100
-        const demotionResult = await this.prisma.aIPrediction.updateMany({
-            where: { featured: true, featuredRank: { gt: 100 } },
             data: { featured: false, featuredRank: null }
         });
-        logger.info(`Demoted ${demotionResult.count} predictions to 'Old' status.`);
+        logger.info('Demoted all previous featured predictions to Old status.');
 
-        // 4. Add 10 new predictions
+        // 3. Add 10 new predictions
         const targetAdd = 10;
         const newMarkets = await this.prisma.market.findMany({
             where: {

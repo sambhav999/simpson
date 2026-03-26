@@ -24,7 +24,7 @@ export class PredictionsService {
                 },
                 include: { market: true },
                 orderBy: { featuredRank: 'asc' },
-                take: 100
+                take: 10
             }),
             this.prisma.aIPrediction.findMany({
                 where: { 
