@@ -86,15 +86,13 @@ const ChatAssistant: React.FC = () => {
   return (
     <div className="chat-assistant-container">
       {isOpen && (
-        <div className="chat-window">
+        <div className="chat-window glass-effect animate-slideUp">
           <div className="chat-header">
-            <div className="chat-bubble active" onClick={() => setIsOpen(false)} style={{ width: 40, height: 40, fontSize: '1.2rem', boxShadow: 'none' }}>
-              ✕
-            </div>
             <div className="chat-header-info">
               <h4>Homer Baba Assistant</h4>
-              <p>● Always Online</p>
+              <p className="online-indicator">● Always Online</p>
             </div>
+            <button className="chat-close-btn" onClick={() => setIsOpen(false)}>✕</button>
           </div>
           
           <div className="chat-messages">
@@ -104,8 +102,9 @@ const ChatAssistant: React.FC = () => {
               </div>
             ))}
             {isLoading && (
-              <div className="chat-message ai" style={{ opacity: 0.7 }}>
-                Homer is thinking...
+              <div className="chat-message ai thinking">
+                <span className="dot">.</span><span className="dot">.</span><span className="dot">.</span>
+                Homer is meditating
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -132,8 +131,8 @@ const ChatAssistant: React.FC = () => {
       )}
       
       {!isOpen && (
-        <div className="chat-bubble" onClick={() => setIsOpen(true)}>
-          🔮
+        <div className="chat-bubble pulse-glow" onClick={() => setIsOpen(true)}>
+          <span className="bubble-icon">🔮</span>
         </div>
       )}
     </div>
