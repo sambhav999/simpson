@@ -46,17 +46,17 @@ export const KNOWLEDGE_BASE = [
   },
   {
     intent: 'ui_navigation_predictions',
-    keywords: ['how to see todays predictions', 'where are predictions', 'show predictions', 'see predictions'],
+    keywords: ['how to see todays predictions', 'where are predictions', 'show predictions', 'see predictions', 'predictio0ns', 'oracle view', 'ai oracle'],
     answer: "To see today's predictions, click on the 'AI Oracle 🔮' tab in the top navigation bar. You'll find Homer Baba's latest picks, confidence scores, and detailed commentary there!"
   },
   {
     intent: 'ui_navigation_challenges',
-    keywords: ['show me todays challenge', 'where is the challenge', 'daily battle ui', 'how to play'],
+    keywords: ['show me todays challenge', 'where is the challenge', 'daily battle ui', 'how to play', 'play daily', 'show challenge', 'battle'],
     answer: "You can find today's challenges in the 'Daily' tab. It shows the active Battle, your current progress, and the global leaderboard for the day!"
   },
   {
     intent: 'ui_navigation_portfolio',
-    keywords: ['where is my portfolio', 'see my trades', 'my stats'],
+    keywords: ['where is my portfolio', 'see my trades', 'my stats', 'how to see my portfolio', 'my balance', 'pnl'],
     answer: "Click on the 'Portfolio' tab or your wallet address in the top right to see your active positions, trade history, and overall performance stats."
   }
 ];
