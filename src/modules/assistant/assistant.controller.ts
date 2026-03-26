@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { HomerAgent } from '../../../AI_agent';
+import { HomerAgent } from '../../AI_agent';
 import { logger } from '../../core/logger/logger';
 
 const router = Router();

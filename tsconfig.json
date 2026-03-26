@@ -24,8 +24,7 @@
     ]
   },
   "include": [
-    "src/**/*",
-    "AI_agent/**/*"
+    "src/**/*"
   ],
   "exclude": [
     "node_modules",
