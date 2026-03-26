@@ -616,7 +616,7 @@ function App() {
       <header className="navbar glass-effect">
         <div className="logo" onClick={() => setCurrentView('markets')}>
           <span className="logo-icon">📊</span>
-          SimPredict
+          Predex
         </div>
 
         <nav className="nav-links">

@@ -40,22 +40,23 @@ async function bootstrap() {
   const solanaListener = new SolanaListener();
   const isInstance0 = process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE;
 
+  const port = config.PORT;
+  server.listen(port, () => {
+    logger.info(`Predex backend running on port ${port}`);
+  });
+
   if (isInstance0) {
-    await marketSyncJob.start();
-    await portfolioSyncJob.start();
-    await feeReconciliationJob.start();
-    await oracleSyncJob.start();
-    await resolutionJob.start();
-    await dailyRotationJob.start();
-    await solanaListener.start();
-    logger.info('Background jobs and listeners started (Instance 0)');
+    marketSyncJob.start().catch(err => logger.error('MarketSyncJob failed to start', err));
+    portfolioSyncJob.start().catch(err => logger.error('PortfolioSyncJob failed to start', err));
+    feeReconciliationJob.start().catch(err => logger.error('FeeReconciliationJob failed to start', err));
+    oracleSyncJob.start().catch(err => logger.error('OracleSyncJob failed to start', err));
+    resolutionJob.start().catch(err => logger.error('ResolutionJob failed to start', err));
+    dailyRotationJob.start().catch(err => logger.error('DailyRotationJob failed to start', err));
+    solanaListener.start().catch(err => logger.error('SolanaListener failed to start', err));
+    logger.info('Background jobs and listeners initiated (Instance 0)');
   } else {
     logger.info(`API Instance ${process.env.NODE_APP_INSTANCE} started (Jobs disabled)`);
   }
-  const port = config.PORT;
-  server.listen(port, () => {
-    logger.info(`SimPredict backend running on port ${port}`);
-  });
   const shutdown = async () => {
     logger.info('Shutting down gracefully...');
     await marketSyncJob.stop();

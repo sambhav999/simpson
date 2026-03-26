@@ -15,7 +15,7 @@ const ChatAssistant: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
-      text: "Hello! I'm Homer Baba, your SimPredict guide. 🔮 How can I help you today?",
+      text: "Hello! I'm Homer Baba, your Predex guide. 🔮 How can I help you today?",
       sender: 'ai',
       timestamp: new Date()
     }
@@ -113,7 +113,7 @@ const ChatAssistant: React.FC = () => {
           <div className="chat-input-area">
             <input
               type="text"
-              placeholder="Ask anything about SimPredict..."
+              placeholder="Ask anything about Predex..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}

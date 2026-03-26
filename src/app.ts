@@ -62,7 +62,7 @@ export function buildApp() {
     app.use(limiter);
 
     app.get('/health', (_req, res) => {
-        res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'simpredict-backend' });
+        res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'predex-backend' });
     });
 
     // Existing routes

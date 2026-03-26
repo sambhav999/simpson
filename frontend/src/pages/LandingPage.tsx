@@ -65,7 +65,7 @@ export default function LandingPage() {
                 </div>
 
                 <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-amber-400 bg-clip-text text-transparent leading-tight mb-4">
-                    SimPredicts
+                    Predex
                 </h1>
                 <p className="text-xl text-gray-300 mb-2 font-medium">Discover. Predict. Flex.</p>
                 <p className="text-sm text-gray-500 mb-10 max-w-xs mx-auto">
