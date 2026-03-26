@@ -42,7 +42,7 @@ async function bootstrap() {
 
   const port = config.PORT;
   server.listen(port, () => {
-    logger.info(`Predex backend running on port ${port}`);
+    logger.info(`SimPredict backend running on port ${port}`);
   });
 
   if (isInstance0) {
