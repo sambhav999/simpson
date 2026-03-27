@@ -26,7 +26,7 @@ services:
           type: redis
           property: connectionString
       - key: HELIUS_RPC_URL
-        sync: false
+        value: https://devnet.helius-rpc.com/?api-key=e18fbc79-aae8-42a4-80ec-873256b73a50
       - key: LIMITLESS_API_URL
         value: https://api.limitless.exchange
       - key: POLYMARKET_API_URL

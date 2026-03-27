@@ -9,10 +9,14 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
         PORT: 3000,
+        SOLANA_NETWORK: 'devnet',
+        HELIUS_RPC_URL: 'https://devnet.helius-rpc.com/?api-key=e18fbc79-aae8-42a4-80ec-873256b73a50',
       },
       env_production: {
         NODE_ENV: 'production',
         PORT: 3000,
+        SOLANA_NETWORK: 'devnet',
+        HELIUS_RPC_URL: 'https://devnet.helius-rpc.com/?api-key=e18fbc79-aae8-42a4-80ec-873256b73a50',
       },
 
       // Graceful restart
