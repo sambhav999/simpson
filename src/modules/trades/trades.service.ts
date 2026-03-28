@@ -61,6 +61,12 @@ export class TradesService {
       amount: params.amount,
     };
     const quote = await this.aggregator.getTradeQuote(quoteParams);
+    const unitPrice = params.side === 'YES' ? market.yesPrice : market.noPrice;
+    const normalizedUnitPrice = typeof unitPrice === 'number' && unitPrice > 0 ? unitPrice : quote.expectedPrice;
+    const fee = quote.fee || 0;
+    const shares = normalizedUnitPrice > 0 ? params.amount / normalizedUnitPrice : 0;
+    const estimatedPayout = shares;
+    const estimatedProfit = estimatedPayout - params.amount - fee;
 
     tradeQuotesRequested.inc();
     logger.info(`Trade quote generated for ${params.wallet} in market ${params.marketId}`);
@@ -70,8 +76,14 @@ export class TradesService {
       side: params.side,
       tokenMint,
       amount: params.amount,
-      total: params.amount + (quote.fee || 0),
+      stake: params.amount,
+      unitPrice: normalizedUnitPrice,
+      shares,
+      estimatedPayout,
+      estimatedProfit,
+      total: params.amount + fee,
       ...quote,
+      expectedPrice: normalizedUnitPrice,
     };
   }
 
