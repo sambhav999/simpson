@@ -8,6 +8,43 @@ export const marketsRouter = Router();
 const marketsService = new MarketsService();
 const prisma = PrismaService.getInstance();
 
+function mapMarketForFrontend(market: {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  yesPrice: number | null;
+  noPrice: number | null;
+  volume: number | null;
+  liquidity: number | null;
+  closesAt: Date | null;
+  expiry: Date | null;
+  resolved?: boolean;
+  resolution?: string | null;
+  source: string;
+  sourceUrl: string | null;
+  image: string | null;
+  createdAt?: Date;
+}) {
+  return {
+    id: market.id,
+    question: market.title,
+    description: market.description,
+    category: market.category,
+    yes_price: market.yesPrice,
+    no_price: market.noPrice,
+    volume: market.volume,
+    liquidity: market.liquidity,
+    closes_at: market.closesAt || market.expiry,
+    resolved: market.resolved,
+    resolution: market.resolution,
+    source: market.source,
+    source_url: market.sourceUrl,
+    image_url: market.image,
+    created_at: market.createdAt,
+  };
+}
+
 // GET /markets — List markets with filtering
 marketsRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -25,7 +62,10 @@ marketsRouter.get('/', async (req: Request, res: Response, next: NextFunction) =
         limit: limit ? Number(limit) : undefined,
       }
     );
-    res.json(result);
+    res.json({
+      data: result.data.map(mapMarketForFrontend),
+      pagination: result.pagination,
+    });
   } catch (error) {
     next(error);
   }
@@ -55,19 +95,7 @@ marketsRouter.get('/featured', async (_req: Request, res: Response, next: NextFu
     });
 
     const markets = predictions.map((p, idx) => ({
-      id: p.market.id,
-      question: p.market.title,
-      description: p.market.description,
-      category: p.market.category,
-      yes_price: p.market.yesPrice,
-      no_price: p.market.noPrice,
-      volume: p.market.volume,
-      liquidity: p.market.liquidity,
-      closes_at: p.market.closesAt || p.market.expiry,
-      source: p.market.source,
-      source_url: p.market.sourceUrl,
-      image_url: p.market.image,
-      created_at: p.market.createdAt,
+      ...mapMarketForFrontend(p.market),
       ai_prediction: {
         prediction: p.prediction,
         confidence: p.confidence,
@@ -106,20 +134,7 @@ marketsRouter.get('/:id', optionalAuth, async (req: Request, res: Response, next
     const creator = market.creatorMarkets[0];
 
     res.json({
-      id: market.id,
-      question: market.title,
-      description: market.description,
-      category: market.category,
-      yes_price: market.yesPrice,
-      no_price: market.noPrice,
-      volume: market.volume,
-      liquidity: market.liquidity,
-      closes_at: market.closesAt || market.expiry,
-      resolved: market.resolved,
-      resolution: market.resolution,
-      source: market.source,
-      source_url: market.sourceUrl,
-      image_url: market.image,
+      ...mapMarketForFrontend(market),
       ai_prediction: aiPrediction ? {
         prediction: aiPrediction.prediction,
         confidence: aiPrediction.confidence,
