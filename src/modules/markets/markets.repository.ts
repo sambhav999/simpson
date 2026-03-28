@@ -33,6 +33,8 @@ export class MarketsRepository {
         source: market.source || 'polymarket',
         volume: this.parseNumericString(market.volume),
         liquidity: this.parseNumericString(market.liquidity),
+        yesPrice: market.prices ? market.prices[0] : null,
+        noPrice: market.prices ? market.prices[1] : null,
       },
       update: {
         title: market.title,
@@ -46,6 +48,8 @@ export class MarketsRepository {
         source: market.source || undefined,
         volume: this.parseNumericString(market.volume),
         liquidity: this.parseNumericString(market.liquidity),
+        yesPrice: market.prices ? market.prices[0] : null,
+        noPrice: market.prices ? market.prices[1] : null,
       },
     });
   }

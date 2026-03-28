@@ -429,6 +429,25 @@ export class AggregatorService {
                             }
                         } catch (e) { /* Default dummy mints if unparsable */ }
 
+                        let parsedPrices: number[] | undefined = undefined;
+                        try {
+                            if (market.outcomePrices && typeof market.outcomePrices === 'string') {
+                                const pricesArr = JSON.parse(market.outcomePrices);
+                                if (Array.isArray(pricesArr) && pricesArr.length >= 2) {
+                                    let yesIndex = 0;
+                                    let noIndex = 1;
+                                    if (market.outcomes && typeof market.outcomes === 'string') {
+                                        const outcomesArr = JSON.parse(market.outcomes);
+                                        const yIdx = outcomesArr.findIndex((o: string) => o.toLowerCase() === 'yes');
+                                        const nIdx = outcomesArr.findIndex((o: string) => o.toLowerCase() === 'no');
+                                        if (yIdx !== -1) yesIndex = yIdx;
+                                        if (nIdx !== -1) noIndex = nIdx;
+                                    }
+                                    parsedPrices = [parseFloat(pricesArr[yesIndex]) || 0, parseFloat(pricesArr[noIndex]) || 0];
+                                }
+                            }
+                        } catch (e) { /* Ignore unparsable prices */ }
+
                         parsedMarkets.push({
                             id: `POLY-${market.id || event.id}`,
                             title: market.question || event.title || 'Unknown Market',
@@ -439,6 +458,7 @@ export class AggregatorService {
                             status: market.active ? 'active' : 'inactive',
                             category: (event.tags && event.tags.length > 0) ? event.tags[0].label || event.tags[0] : 'Polymarket',
                             image: market.image || market.icon || event.image || event.icon || undefined,
+                            prices: parsedPrices,
                         });
                     }
                 }
@@ -701,6 +721,87 @@ export class AggregatorService {
             const message = error instanceof Error ? error.message : 'Unknown error';
             logger.error(`Failed to fetch market ${marketId}: ${message}`);
             throw new AppError(`Aggregator market fetch failed: ${message}`, 502);
+        }
+    }
+
+    /**
+     * Attempts to fetch the real, finalized resolution from the data source API.
+     * Returns "YES", "NO", or null if the market is not yet resolved.
+     */
+    async getMarketResolution(source: string, externalId: string): Promise<'YES' | 'NO' | null> {
+        try {
+            if (!externalId) return null;
+
+            if (source === 'polymarket') {
+                const id = externalId.replace('POLY-', '');
+                if (id.startsWith('FB-')) return null; // Fallback mock markets
+
+                const response = await this.polymarketClient.get(`/markets/${id}`).catch(() => null);
+                const data = response?.data;
+                
+                if (data && data.closed) {
+                    // Polymarket outcomePrices is a JSON-string array: ["0.000", "0.999"]
+                    // The index of outcome corresponds to ["Yes", "No"] 
+                    const outcomesStr = data.outcomes as string;
+                    const pricesStr = data.outcomePrices as string;
+                    
+                    if (outcomesStr && pricesStr) {
+                        try {
+                            const outcomesArr: string[] = JSON.parse(outcomesStr);
+                            const pricesArr: string[] = JSON.parse(pricesStr);
+                            
+                            // Find the index with a price near 1
+                            if (outcomesArr.length === 2 && pricesArr.length === 2) {
+                                const p1 = parseFloat(pricesArr[0]);
+                                const p2 = parseFloat(pricesArr[1]);
+                                
+                                // Return the outcome that got resolved to 1
+                                if (p1 > 0.99) return outcomesArr[0].toUpperCase() === 'YES' ? 'YES' : 'NO';
+                                if (p2 > 0.99) return outcomesArr[1].toUpperCase() === 'YES' ? 'YES' : 'NO';
+                            }
+                        } catch (e) {
+                            logger.warn(`Polymarket outcome parse failed for ${externalId}`);
+                        }
+                    }
+                }
+                return null;
+            }
+
+            if (source === 'manifold') {
+                const id = externalId.replace('MNF-', '');
+                const response = await this.manifoldClient.get(`/v0/market/${id}`).catch(() => null);
+                const data = response?.data;
+                
+                if (data && data.isResolved && data.resolution) {
+                    const resStr = data.resolution.toUpperCase();
+                    if (resStr === 'YES' || resStr === 'NO') return resStr as 'YES' | 'NO';
+                }
+                return null;
+            }
+
+            if (source === 'kalshi') {
+                const ticker = externalId.replace('KAL-', '');
+                if (ticker.startsWith('FB-')) return null; // Fallback mocks
+
+                const response = await this.kalshiClient.get(`/markets/${ticker}`).catch(() => null);
+                const data = response?.data?.market;
+
+                if (data) {
+                    if (data.status === 'determined' || data.status === 'settled') {
+                        if (data.result === 'yes' || data.result === 'YES') return 'YES';
+                        if (data.result === 'no' || data.result === 'NO') return 'NO';
+                    }
+                }
+                return null;
+            }
+
+            // Other sources (Limitless, SXBet, Hedgehog) aren't fully supported for direct single-fetch resolution yet
+            return null;
+
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            logger.error(`Failed to fetch real market resolution for ${externalId} (${source}): ${message}`);
+            return null;
         }
     }
 

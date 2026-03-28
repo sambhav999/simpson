@@ -2,14 +2,17 @@
 import { PrismaService } from '../../core/config/prisma.service';
 import { logger } from '../../core/logger/logger';
 import { PriceOracleService } from './price-oracle.service';
+import { AggregatorService } from '../markets-aggregator/aggregator.service';
 
 export class ResolutionService {
   private readonly prisma: PrismaService;
   private readonly oracle: PriceOracleService;
+  private readonly aggregator: AggregatorService;
 
   constructor() {
     this.prisma = PrismaService.getInstance();
     this.oracle = new PriceOracleService();
+    this.aggregator = new AggregatorService();
   }
 
   /**
@@ -46,9 +49,17 @@ export class ResolutionService {
           logger.info(`[ResolutionService] Real outcome found for market ${market.id}: ${realOutcome}`);
           outcome = realOutcome;
         } else {
-          // Fallback to YES for MVP if no real data found
-          logger.warn(`[ResolutionService] No real outcome found for market ${market.id}, using fallback YES`);
-          outcome = 'YES';
+          // Attempt to get real outcome from the external aggregator (Polymarket, Kalshi, etc.)
+          const aggregatorOutcome = await this.aggregator.getMarketResolution(market.source, market.externalId || '');
+          if (aggregatorOutcome) {
+            logger.info(`[ResolutionService] Real external outcome found for market ${market.id}: ${aggregatorOutcome}`);
+            outcome = aggregatorOutcome;
+          } else {
+            // Outcome not yet determined by external API or unsupported. 
+            // Skip processing to leave it pending for the next cycle.
+            logger.info(`[ResolutionService] Market ${market.id} is not yet officially resolved by source, staying pending...`);
+            continue;
+          }
         }
       }
       
