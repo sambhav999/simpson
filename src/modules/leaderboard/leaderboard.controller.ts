@@ -16,6 +16,16 @@ function getRankBadge(xpTotal: number): string {
   return 'Apprentice Prophet';
 }
 
+function getAccuracyStatus(winRate: number, totalPredictions: number): string {
+  if (totalPredictions === 0) return 'Unranked Seer';
+  if (winRate >= 0.9) return 'Mythic Forecaster';
+  if (winRate >= 0.8) return 'Elite Oracle';
+  if (winRate >= 0.7) return 'Sharp Prophet';
+  if (winRate >= 0.6) return 'Skilled Predictor';
+  if (winRate >= 0.5) return 'Rising Analyst';
+  return 'Learning Apprentice';
+}
+
 // GET /leaderboard — XP leaderboard (existing, enhanced)
 leaderboardRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -115,6 +125,7 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
     }
 
     const usePeriodXP = timeframe !== 'all_time';
+    const showStatus = timeframe === 'all_time';
 
     res.json({
       total_players: leaderboard.length,
@@ -128,6 +139,7 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
           rank_badge: getRankBadge(u.xpTotal || 0),
         },
         xp: usePeriodXP ? (u.periodXP ?? u.xpTotal) : u.xpTotal,
+        status: showStatus ? getRankBadge(u.xpTotal || 0) : null,
       })),
       current_user_rank: currentUserRank,
     });
@@ -194,6 +206,7 @@ leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: Nex
     const scorers = entries.filter(e => e.total > 0).sort((a, b) => b.winRate - a.winRate);
     const nonScorers = entries.filter(e => e.total === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     const sorted = [...scorers, ...nonScorers].slice(0, maxResults);
+    const showStatus = timeframe === 'all_time';
 
     res.json({
       total_players: sorted.length,
@@ -205,6 +218,7 @@ leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: Nex
         wins: l.wins,
         losses: l.losses,
         current_streak: l.user.currentStreak || 0,
+        status: showStatus ? getAccuracyStatus(l.winRate, l.total) : null,
       })),
     });
   } catch (err) {
