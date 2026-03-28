@@ -31,58 +31,81 @@ leaderboardRouter.get('/', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
-// GET /leaderboard/xp — XP leaders
+// GET /leaderboard/xp — XP leaders (all users including zero-score)
 leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { timeframe = 'all_time', limit = '100' } = req.query;
-
+    const maxResults = Number(limit);
     const now = new Date();
     let leaderboard: any[];
 
+    // Fetch ALL users for merging zero-score users
+    const allUsers = await prisma.user.findMany({
+      select: { walletAddress: true, username: true, avatarUrl: true, xpTotal: true, createdAt: true },
+    });
+
     if (timeframe === 'daily') {
-      // Daily: Show all users active today, sorted by XP desc; zero-XP users at bottom by FCFS (createdAt asc)
+      // Daily: XP earned today from XP transactions
       const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
-      const dailyUsers = await prisma.user.findMany({
-        where: { updatedAt: { gte: dayStart } },
-        select: { walletAddress: true, username: true, avatarUrl: true, xpTotal: true, createdAt: true },
-      });
-      // Split into scorers (xp > 0) and non-scorers
-      const scorers = dailyUsers.filter(u => u.xpTotal > 0).sort((a, b) => b.xpTotal - a.xpTotal);
-      const nonScorers = dailyUsers.filter(u => u.xpTotal === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      leaderboard = [...scorers, ...nonScorers].slice(0, Number(limit));
-    } else if (timeframe === 'all_time') {
-      leaderboard = await prisma.user.findMany({
-        orderBy: { xpTotal: 'desc' },
-        take: Number(limit),
-        select: { walletAddress: true, username: true, avatarUrl: true, xpTotal: true, createdAt: true },
-      });
-    } else {
-      // weekly / monthly: Aggregate XP from transactions in the period
-      let dateFilter: any = {};
-      if (timeframe === 'weekly') {
-        const start = new Date(now); start.setDate(now.getDate() - 7);
-        dateFilter = { createdAt: { gte: start } };
-      } else if (timeframe === 'monthly') {
-        const start = new Date(now); start.setMonth(now.getMonth() - 1);
-        dateFilter = { createdAt: { gte: start } };
-      }
-      const xpByUser = await prisma.xPTransaction.groupBy({
+      const dailyXP = await prisma.xPTransaction.groupBy({
         by: ['walletAddress'],
-        where: dateFilter,
+        where: { createdAt: { gte: dayStart } },
         _sum: { amount: true },
-        orderBy: { _sum: { amount: 'desc' } },
-        take: Number(limit),
       });
-      const userIds = xpByUser.map(x => x.walletAddress);
-      const users = await prisma.user.findMany({
-        where: { walletAddress: { in: userIds } },
-        select: { walletAddress: true, username: true, avatarUrl: true, xpTotal: true },
-      });
-      const userMap = new Map(users.map(u => [u.walletAddress, u]));
-      leaderboard = xpByUser.map(x => ({
-        ...userMap.get(x.walletAddress),
-        periodXP: x._sum.amount || 0,
+      const xpMap = new Map(dailyXP.map(x => [x.walletAddress, x._sum.amount || 0]));
+
+      const entries = allUsers.map(u => ({
+        ...u,
+        periodXP: xpMap.get(u.walletAddress) || 0,
       }));
+
+      const scorers = entries.filter(e => e.periodXP > 0).sort((a, b) => b.periodXP - a.periodXP);
+      const nonScorers = entries.filter(e => e.periodXP === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      leaderboard = [...scorers, ...nonScorers].slice(0, maxResults);
+
+    } else if (timeframe === 'weekly') {
+      // Weekly: Accumulated XP from last 7 days
+      const weekStart = new Date(now); weekStart.setDate(now.getDate() - 7);
+      const weeklyXP = await prisma.xPTransaction.groupBy({
+        by: ['walletAddress'],
+        where: { createdAt: { gte: weekStart } },
+        _sum: { amount: true },
+      });
+      const xpMap = new Map(weeklyXP.map(x => [x.walletAddress, x._sum.amount || 0]));
+
+      const entries = allUsers.map(u => ({
+        ...u,
+        periodXP: xpMap.get(u.walletAddress) || 0,
+      }));
+
+      const scorers = entries.filter(e => e.periodXP > 0).sort((a, b) => b.periodXP - a.periodXP);
+      const nonScorers = entries.filter(e => e.periodXP === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      leaderboard = [...scorers, ...nonScorers].slice(0, maxResults);
+
+    } else if (timeframe === 'monthly') {
+      // Monthly: Accumulated XP from last 30 days
+      const monthStart = new Date(now); monthStart.setMonth(now.getMonth() - 1);
+      const monthlyXP = await prisma.xPTransaction.groupBy({
+        by: ['walletAddress'],
+        where: { createdAt: { gte: monthStart } },
+        _sum: { amount: true },
+      });
+      const xpMap = new Map(monthlyXP.map(x => [x.walletAddress, x._sum.amount || 0]));
+
+      const entries = allUsers.map(u => ({
+        ...u,
+        periodXP: xpMap.get(u.walletAddress) || 0,
+      }));
+
+      const scorers = entries.filter(e => e.periodXP > 0).sort((a, b) => b.periodXP - a.periodXP);
+      const nonScorers = entries.filter(e => e.periodXP === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      leaderboard = [...scorers, ...nonScorers].slice(0, maxResults);
+
+    } else {
+      // all_time: Total XP, zero-score at bottom by createdAt
+      const scorers = allUsers.filter(u => u.xpTotal > 0).sort((a, b) => b.xpTotal - a.xpTotal);
+      const nonScorers = allUsers.filter(u => u.xpTotal === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      leaderboard = [...scorers, ...nonScorers].slice(0, maxResults);
     }
 
     // Find current user rank via Redis sorted set
@@ -90,6 +113,8 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
     if (req.user) {
       currentUserRank = await leaderboardService.getUserXPRank(req.user.wallet);
     }
+
+    const usePeriodXP = timeframe !== 'all_time';
 
     res.json({
       total_players: leaderboard.length,
@@ -102,7 +127,7 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
           xp_total: u.xpTotal,
           rank_badge: getRankBadge(u.xpTotal || 0),
         },
-        xp: timeframe === 'all_time' || timeframe === 'daily' ? u.xpTotal : u.periodXP,
+        xp: usePeriodXP ? (u.periodXP ?? u.xpTotal) : u.xpTotal,
       })),
       current_user_rank: currentUserRank,
     });
@@ -111,124 +136,76 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
   }
 });
 
-// GET /leaderboard/accuracy — Top predictors by win rate
+// GET /leaderboard/accuracy — Top predictors by win rate (all users including zero-accuracy)
 leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { min_predictions = '0', limit = '100', timeframe = 'all_time' } = req.query;
-    const minPreds = Number(min_predictions);
+    const { limit = '100', timeframe = 'all_time' } = req.query;
+    const maxResults = Number(limit);
     const now = new Date();
 
-    if (timeframe === 'daily') {
-      // Daily: Show ALL users active today + their accuracy, zero-accuracy at bottom by FCFS
-      const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
-      const dailyUsers = await prisma.user.findMany({
-        where: { updatedAt: { gte: dayStart } },
-        select: { walletAddress: true, username: true, avatarUrl: true, currentStreak: true, xpTotal: true, createdAt: true },
-      });
-      const allWallets = dailyUsers.map(u => u.walletAddress);
+    // Fetch ALL users
+    const allUsers = await prisma.user.findMany({
+      select: { walletAddress: true, username: true, avatarUrl: true, currentStreak: true, xpTotal: true, createdAt: true },
+    });
+    const allWallets = allUsers.map(u => u.walletAddress);
 
-      // Get win/loss counts for daily users
-      const [posResults, winResults] = await Promise.all([
-        prisma.position.groupBy({
-          by: ['walletAddress'],
-          where: { walletAddress: { in: allWallets }, status: { in: ['WON', 'LOST'] } },
-          _count: { _all: true },
-        }),
-        prisma.position.groupBy({
-          by: ['walletAddress'],
-          where: { walletAddress: { in: allWallets }, status: 'WON' },
-          _count: { _all: true },
-        }),
-      ]);
-      const totalMap = new Map(posResults.map(r => [r.walletAddress, r._count._all]));
-      const winMap = new Map(winResults.map(r => [r.walletAddress, r._count._all]));
-
-      const entries = dailyUsers.map(u => {
-        const total = totalMap.get(u.walletAddress) || 0;
-        const wins = winMap.get(u.walletAddress) || 0;
-        return {
-          wallet: u.walletAddress, user: u,
-          total, wins, losses: total - wins,
-          winRate: total > 0 ? wins / total : 0,
-          createdAt: u.createdAt,
-        };
-      });
-
-      // Scorers (have resolved predictions) sorted by winRate desc, then non-scorers by FCFS
-      const scorers = entries.filter(e => e.total > 0).sort((a, b) => b.winRate - a.winRate);
-      const nonScorers = entries.filter(e => e.total === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      const sorted = [...scorers, ...nonScorers].slice(0, Number(limit));
-
-      return res.json({
-        total_players: sorted.length,
-        leaderboard: sorted.map((l, idx) => ({
-          rank: idx + 1,
-          user: { id: l.wallet, username: l.user.username, avatar_url: l.user.avatarUrl },
-          win_rate: l.winRate,
-          total_predictions: l.total,
-          wins: l.wins,
-          losses: l.losses,
-          current_streak: l.user.currentStreak || 0,
-        })),
-      });
-    }
-
-    // Non-daily timeframes: original logic
+    // Build date filter for positions based on timeframe
     let dateFilter: any = {};
-    if (timeframe === 'weekly') {
-      const start = new Date(now); start.setDate(now.getDate() - 7);
-      dateFilter = { updatedAt: { gte: start } };
+    if (timeframe === 'daily') {
+      const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
+      dateFilter = { updatedAt: { gte: dayStart } };
+    } else if (timeframe === 'weekly') {
+      const weekStart = new Date(now); weekStart.setDate(now.getDate() - 7);
+      dateFilter = { updatedAt: { gte: weekStart } };
     } else if (timeframe === 'monthly') {
-      const start = new Date(now); start.setMonth(now.getMonth() - 1);
-      dateFilter = { updatedAt: { gte: start } };
+      const monthStart = new Date(now); monthStart.setMonth(now.getMonth() - 1);
+      dateFilter = { updatedAt: { gte: monthStart } };
     }
+    // all_time: no date filter
 
-    const results = await prisma.position.groupBy({
-      by: ['walletAddress'],
-      where: { status: { in: ['WON', 'LOST'] }, ...dateFilter },
-      _count: { _all: true },
+    // Get win/loss counts for all users within the time period
+    const [posResults, winResults] = await Promise.all([
+      prisma.position.groupBy({
+        by: ['walletAddress'],
+        where: { walletAddress: { in: allWallets }, status: { in: ['WON', 'LOST'] }, ...dateFilter },
+        _count: { _all: true },
+      }),
+      prisma.position.groupBy({
+        by: ['walletAddress'],
+        where: { walletAddress: { in: allWallets }, status: 'WON', ...dateFilter },
+        _count: { _all: true },
+      }),
+    ]);
+    const totalMap = new Map(posResults.map(r => [r.walletAddress, r._count._all]));
+    const winMap = new Map(winResults.map(r => [r.walletAddress, r._count._all]));
+
+    const entries = allUsers.map(u => {
+      const total = totalMap.get(u.walletAddress) || 0;
+      const wins = winMap.get(u.walletAddress) || 0;
+      return {
+        wallet: u.walletAddress, user: u,
+        total, wins, losses: total - wins,
+        winRate: total > 0 ? wins / total : 0,
+        createdAt: u.createdAt,
+      };
     });
-    const qualified = results.filter(r => r._count._all >= minPreds);
-    const wallets = qualified.map(r => r.walletAddress);
 
-    const winCounts = await prisma.position.groupBy({
-      by: ['walletAddress'],
-      where: { walletAddress: { in: wallets }, status: 'WON', ...dateFilter },
-      _count: { _all: true },
-    });
-    const winMap = new Map(winCounts.map(w => [w.walletAddress, w._count._all]));
-    const totalMap = new Map(qualified.map(q => [q.walletAddress, q._count._all]));
-
-    const users = await prisma.user.findMany({
-      where: { walletAddress: { in: wallets } },
-      select: { walletAddress: true, username: true, avatarUrl: true, currentStreak: true, xpTotal: true },
-    });
-    const userMap = new Map(users.map(u => [u.walletAddress, u]));
-
-    const leaderboard = wallets
-      .map(w => ({
-        wallet: w,
-        wins: winMap.get(w) || 0,
-        total: totalMap.get(w) || 0,
-        winRate: (totalMap.get(w) || 0) > 0 ? (winMap.get(w) || 0) / (totalMap.get(w) || 0) : 0,
-      }))
-      .sort((a, b) => b.winRate - a.winRate)
-      .slice(0, Number(limit));
+    // Scorers (have resolved predictions) sorted by winRate desc, then non-scorers by FCFS
+    const scorers = entries.filter(e => e.total > 0).sort((a, b) => b.winRate - a.winRate);
+    const nonScorers = entries.filter(e => e.total === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const sorted = [...scorers, ...nonScorers].slice(0, maxResults);
 
     res.json({
-      total_players: leaderboard.length,
-      leaderboard: leaderboard.map((l, idx) => {
-        const user = userMap.get(l.wallet);
-        return {
-          rank: idx + 1,
-          user: { id: l.wallet, username: user?.username, avatar_url: user?.avatarUrl },
-          win_rate: l.winRate,
-          total_predictions: l.total,
-          wins: l.wins,
-          losses: l.total - l.wins,
-          current_streak: user?.currentStreak || 0,
-        };
-      }),
+      total_players: sorted.length,
+      leaderboard: sorted.map((l, idx) => ({
+        rank: idx + 1,
+        user: { id: l.wallet, username: l.user.username, avatar_url: l.user.avatarUrl },
+        win_rate: l.winRate,
+        total_predictions: l.total,
+        wins: l.wins,
+        losses: l.losses,
+        current_streak: l.user.currentStreak || 0,
+      })),
     });
   } catch (err) {
     next(err);
