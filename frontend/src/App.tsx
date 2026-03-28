@@ -592,6 +592,24 @@ function App() {
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
       });
 
+      // 5. Record the successful trade in the backend to create a Position
+      try {
+        await fetch(`${API}/trade`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress,
+            marketId: selectedMarket.id,
+            side,
+            amount: Number(amount),
+            price: quote?.price || 0.5,
+            signature,
+          })
+        });
+      } catch (recordErr) {
+        console.error('Failed to record trade:', recordErr);
+      }
+
       setTradeSuccess(true);
       setPortfolioRefreshTrigger(prev => prev + 1);
     } catch (err: any) {

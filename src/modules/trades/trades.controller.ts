@@ -34,7 +34,7 @@ tradesRouter.post('/quote', async (req: Request, res: Response, next: NextFuncti
  */
 tradesRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { walletAddress, marketId, tokenMint, side, amount, price } = req.body;
+    const { walletAddress, marketId, tokenMint, side, amount, price, signature: realSignature } = req.body;
 
     if (!walletAddress || !marketId || !side || !amount) {
       return next(new AppError('Missing required trade fields', 400));
@@ -44,8 +44,8 @@ tradesRouter.post('/', async (req: Request, res: Response, next: NextFunction) =
     const market = await (tradesService as any).prisma.market.findUnique({ where: { id: marketId } });
     const finalTokenMint = tokenMint || (side === 'YES' ? market?.yesTokenMint : market?.noTokenMint) || 'placeholder_mint';
 
-    // Generate a unique simulation signature if not provided
-    const signature = `sim_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
+    // Use real on-chain signature if provided, otherwise generate a simulated one
+    const signature = realSignature || `sim_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
 
     const trade = await tradesService.recordTrade({
       walletAddress,
