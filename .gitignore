@@ -5,6 +5,9 @@ package-lock.json
 # Build output
 dist/
 
+# Frontend (runs locally, not on server)
+frontend/
+
 # Environment files
 .env
 .env.local
