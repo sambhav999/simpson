@@ -102,6 +102,7 @@ model Position {
   @@unique([walletAddress, marketId, tokenMint])
   @@index([walletAddress])
   @@index([marketId])
+  @@index([walletAddress, marketId])
   @@index([status])
   @@map("positions")
 }

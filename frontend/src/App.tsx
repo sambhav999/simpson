@@ -486,7 +486,7 @@ function App() {
 
   // Trade state & logic
   const [side, setSide] = useState<'YES' | 'NO'>('YES');
-  const [amount, setAmount] = useState('10');
+  const [amount, setAmount] = useState('1');
   const [quote, setQuote] = useState<any>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -494,6 +494,15 @@ function App() {
   const [tradeSuccess, setTradeSuccess] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'qr'>('wallet');
   const [qrUri] = useState('');
+
+  const handleCloseModal = () => {
+    setSelectedMarket(null);
+    setSide('YES');
+    setAmount('1');
+    setQuote(null);
+    setQuoteError(null);
+    setTradeSuccess(false);
+  };
 
   const getQuote = async () => {
     if (!selectedMarket || !amount || !walletAddress) {
@@ -534,9 +543,18 @@ function App() {
     }
     setConfirming(true);
     setQuoteError(null);
+    let transaction: any = null;
     try {
+      // 0. Pre-flight: check if user already has a position on this market
+      const existingPosition = userPositions.find(p => p.marketId === selectedMarket.id);
+      if (existingPosition) {
+        setQuoteError('You have already placed a bet on this question.');
+        setConfirming(false);
+        return;
+      }
+
       // 1. Get a unique reference key for this transaction to track it
-      const { Keypair, Transaction } = await import('@solana/web3.js');
+      const { Keypair, Transaction: SolanaTransaction } = await import('@solana/web3.js');
       const reference = Keypair.generate().publicKey;
 
       // 2. Fetch the real transaction from the backend
@@ -561,8 +579,9 @@ function App() {
       const { transaction: base64Tx } = await res.json();
 
       // 3. Deserialize and sign transaction
-      const transaction = Transaction.from(Buffer.from(base64Tx, 'base64'));
+      transaction = SolanaTransaction.from(Buffer.from(base64Tx, 'base64'));
       
+      console.log('Attempting transaction on:', connection.rpcEndpoint);
       const signature = await sendTransaction(transaction, connection);
       
       // 4. Wait for confirmation
@@ -577,9 +596,14 @@ function App() {
       setPortfolioRefreshTrigger(prev => prev + 1);
     } catch (err: any) {
       console.error('Trade execution failed:', err);
+      if (transaction) console.log('Transaction details:', transaction);
+      console.log('Connection RPC:', connection.rpcEndpoint);
+      
       let errorMessage = err.message || 'Transaction failed or cancelled';
       
-      if (errorMessage.toLowerCase().includes('insufficient funds') || 
+      if (err.name === 'WalletSendTransactionError') {
+        errorMessage = `Wallet Error: ${err.message}. Please ensure your wallet is set to Devnet.`;
+      } else if (errorMessage.toLowerCase().includes('insufficient funds') || 
           errorMessage.toLowerCase().includes('insufficient balance')) {
         errorMessage = 'Transaction failed due to insufficient funds';
         
@@ -910,7 +934,7 @@ function App() {
         <TradeModal
           isOpen={!!selectedMarket}
           market={selectedMarket}
-          onClose={() => setSelectedMarket(null)}
+          onClose={handleCloseModal}
           side={side}
           setSide={setSide}
           amount={amount}

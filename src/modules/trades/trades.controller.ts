@@ -151,7 +151,9 @@ tradesRouter.post('/record-failure', async (req: Request, res: Response, next: N
     const market = await (tradesService as any).prisma.market.findUnique({ where: { id: marketId } });
     const tokenMint = side === 'YES' ? market?.yesTokenMint : market?.noTokenMint;
 
-    const trade = await tradesService.recordTrade({
+    // Use recordFailure instead of recordTrade so no Position is created
+    // This allows the user to retry after a failed attempt
+    const trade = await tradesService.recordFailure({
       walletAddress,
       marketId,
       tokenMint: tokenMint || 'placeholder_mint',

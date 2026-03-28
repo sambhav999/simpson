@@ -259,6 +259,43 @@ export class TradesService {
     await this.updatePositionAfterTrade(data);
     return trade;
   }
+
+  /**
+   * Record a failed trade attempt (e.g. insufficient funds).
+   * This creates a Trade record with FAILED status but does NOT create a Position,
+   * so the user is free to retry.
+   */
+  async recordFailure(data: {
+    walletAddress: string;
+    marketId: string;
+    tokenMint: string;
+    side: string;
+    price: number;
+    amount: number;
+    signature: string;
+    timestamp: Date;
+    betSide?: string;
+    status?: string;
+  }) {
+    const trade = await this.prisma.trade.create({
+      data: {
+        walletAddress: data.walletAddress,
+        marketId: data.marketId,
+        tokenMint: data.tokenMint,
+        side: data.side,
+        betSide: data.betSide,
+        price: data.price,
+        amount: data.amount,
+        signature: data.signature,
+        status: data.status || 'FAILED',
+        timestamp: data.timestamp,
+      },
+    });
+
+    logger.info(`Failed trade recorded for ${data.walletAddress} on market ${data.marketId}: ${data.status}`);
+    return trade;
+  }
+
   private async updatePositionAfterTrade(data: {
     walletAddress: string;
     marketId: string;
