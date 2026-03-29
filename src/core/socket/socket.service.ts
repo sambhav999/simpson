@@ -32,8 +32,14 @@ export class SocketService {
     this.io = new SocketIOServer(server, {
       transports: ['websocket'],
       cors: {
-        origin: '*', // In production, this should be restricted
+        origin: [
+          'https://zeevano.com',
+          'https://www.zeevano.com',
+          'http://localhost:5173',
+          'http://localhost:3000',
+        ],
         methods: ['GET', 'POST'],
+        credentials: true,
       },
     });
 

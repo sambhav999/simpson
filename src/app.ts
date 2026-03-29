@@ -32,8 +32,21 @@ export function buildApp() {
     app.set('trust proxy', 1);
 
     app.use(helmet({ crossOriginResourcePolicy: false }));
+    const allowedOrigins = [
+        'https://zeevano.com',
+        'https://www.zeevano.com',
+        'http://localhost:5173',
+        'http://localhost:3000',
+    ];
     app.use(cors({
-        origin: true, // Reflects the request origin, or use ['http://localhost:5173', 'https://...']
+        origin: (origin, callback) => {
+            // Allow requests with no origin (mobile apps, curl, etc.)
+            if (!origin || allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error(`Origin ${origin} not allowed by CORS`));
+            }
+        },
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         credentials: true
     }));

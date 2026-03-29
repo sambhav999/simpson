@@ -28,7 +28,7 @@ const envSchema = z.object({
   R2_BUCKET_NAME: z.string().default('simpredicts-cards'),
 
   // App
-  APP_URL: z.string().default('http://localhost:5173'),
+  APP_URL: z.string().default('https://zeevano.com'),
 });
 
 const parsed = envSchema.safeParse(process.env);
