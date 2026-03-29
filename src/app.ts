@@ -24,6 +24,7 @@ import { cardsRouter } from './modules/cards/cards.controller';
 import { dailyRouter } from './modules/daily/daily.controller';
 import { assistantRouter } from './modules/assistant/assistant.controller';
 import { errorHandler } from './core/config/error.handler';
+import { config } from './core/config/config';
 
 export function buildApp() {
     const app = express();
@@ -35,13 +36,19 @@ export function buildApp() {
     const allowedOrigins = [
         'https://zeevano.com',
         'https://www.zeevano.com',
+        'https://predex2.netlify.app',
         'http://localhost:5173',
         'http://localhost:3000',
+        config.APP_URL,
+        ...(config.CORS_ALLOWED_ORIGINS
+            ? config.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+            : []),
     ];
+    const normalizedAllowedOrigins = Array.from(new Set(allowedOrigins));
     app.use(cors({
         origin: (origin, callback) => {
             // Allow requests with no origin (mobile apps, curl, etc.)
-            if (!origin || allowedOrigins.includes(origin)) {
+            if (!origin || normalizedAllowedOrigins.includes(origin)) {
                 callback(null, true);
             } else {
                 callback(new Error(`Origin ${origin} not allowed by CORS`));

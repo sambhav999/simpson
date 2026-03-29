@@ -29,6 +29,7 @@ const envSchema = z.object({
 
   // App
   APP_URL: z.string().default('https://zeevano.com'),
+  CORS_ALLOWED_ORIGINS: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
