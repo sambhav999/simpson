@@ -116,42 +116,23 @@ cd frontend && npm install && cd ..
 
 ### 2. Configure Environment
 
-Create `.env` in the project root:
+Ensure your `.env` (root) and `frontend/.env` files are configured with the following required variables:
 
-```env
-# Database
-DATABASE_URL="postgresql://user:pass@host:5432/simpredict"
+**Backend (`.env`)**:
+- `DATABASE_URL`
+- `REDIS_URL`
+- `HELIUS_RPC_URL`
+- `SOLANA_NETWORK`
+- `PRIVY_APP_ID`
+- `PRIVY_APP_SECRET`
+- `PORT`
+- `NODE_ENV`
 
-# Redis
-REDIS_URL="redis://localhost:6379"
+**Frontend (`frontend/.env`)**:
+- `VITE_BACKEND_URL`
+- `VITE_SOLANA_RPC_URL`
+- `VITE_PRIVY_APP_ID`
 
-# Solana
-HELIUS_RPC_URL="https://devnet.helius-rpc.com/?api-key=YOUR_KEY"
-SOLANA_NETWORK=devnet
-
-# Aggregator APIs
-LIMITLESS_API_URL="https://api.limitless.exchange"
-POLYMARKET_API_URL="https://gamma-api.polymarket.com"
-
-# Server
-PORT=3000
-NODE_ENV=development
-LOG_LEVEL=info
-
-# Auth
-JWT_SECRET=your-secure-secret
-JWT_EXPIRY=24h
-
-# Frontend URL
-APP_URL=http://localhost:5173
-```
-
-Create `frontend/.env`:
-
-```env
-VITE_BACKEND_URL=http://localhost:3000
-VITE_SOLANA_RPC_URL=https://devnet.helius-rpc.com/?api-key=YOUR_KEY
-```
 
 ### 3. Set Up Database
 
@@ -212,7 +193,7 @@ curl -X POST http://localhost:3000/markets/sync
 | `POST` | `/api/follow` | Follow user |
 | `GET` | `/api/feed` | Activity feed |
 
-> For the full API reference with all 40+ endpoints, see [endpoints.md](./endpoints.md).
+> For more details on the API architecture, see the source code in `src/modules/`.
 
 ---
 
@@ -236,7 +217,7 @@ Seven BullMQ workers run on configurable cron schedules:
 
 ### 🚀 Zomro VPS (Production)
 
-The production backend is hosted at `http://188.137.230.72`.
+The production backend is hosted on a managed VPS.
 
 **Deployment Workflow:**
 1. **SSH**: Connect as root.
