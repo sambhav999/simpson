@@ -116,91 +116,22 @@ cd frontend && npm install && cd ..
 
 ### 2. Configure Environment
 
-Create a `.env` file in the project root and a `.env` inside `frontend/`. Use the tables below as a reference.
+Ensure your `.env` (root) and `frontend/.env` files are configured with the following required variables:
 
-#### Backend `.env`
+**Backend (`.env`)**:
+- `DATABASE_URL`
+- `REDIS_URL`
+- `HELIUS_RPC_URL`
+- `SOLANA_NETWORK`
+- `PRIVY_APP_ID`
+- `PRIVY_APP_SECRET`
+- `PORT`
+- `NODE_ENV`
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | ✅ | MongoDB connection string (Atlas or local) |
-| `REDIS_URL` | ✅ | Redis connection URL |
-| `HELIUS_RPC_URL` | ✅ | Solana RPC endpoint (Helius recommended) |
-| `SOLANA_NETWORK` | ✅ | `devnet` or `mainnet-beta` |
-| `FEE_WALLET_ADDRESS` | ✅ | Wallet that receives platform fees |
-| `TREASURY_WALLET` | ✅ | Treasury wallet for fund management |
-| `PRIVY_APP_ID` | ✅ | Privy authentication app ID |
-| `PRIVY_APP_SECRET` | ✅ | Privy authentication app secret |
-| `PORT` | ✅ | Server port (default `3000`) |
-| `NODE_ENV` | ✅ | `development` or `production` |
-| `LIMITLESS_API_URL` | ✅ | Limitless Exchange API base URL |
-| `LIMITLESS_API_KEY` | ❌ | Optional Limitless API key (`lmts_...`) |
-| `POLYMARKET_API_URL` | ✅ | Polymarket Gamma API base URL |
-| `MANIFOLD_API_URL` | ✅ | Manifold Markets API base URL |
-| `HEDGEHOG_API_URL` | ✅ | Hedgehog Markets API base URL |
-| `KALSHI_API_URL` | ✅ | Kalshi API base URL |
-| `SXBET_API_URL` | ✅ | SX Bet API base URL |
-| `LOG_LEVEL` | ❌ | Log verbosity (`info`, `debug`, `warn`, `error`) |
-| `R2_ENDPOINT` | ❌ | Cloudflare R2 S3-compatible endpoint |
-| `R2_ACCESS_KEY_ID` | ❌ | Cloudflare R2 access key |
-| `R2_SECRET_ACCESS_KEY` | ❌ | Cloudflare R2 secret key |
-| `R2_BUCKET_NAME` | ❌ | R2 bucket name for meme cards |
-| `APP_URL` | ❌ | Frontend URL for CORS / redirects |
-
-<details>
-<summary><strong>Example <code>.env</code> (click to expand)</strong></summary>
-
-```env
-# Database
-DATABASE_URL="mongodb+srv://<user>:<password>@<cluster>.mongodb.net/simpredict?appName=Cluster0"
-
-# Redis
-REDIS_URL="redis://localhost:6379"
-
-# Solana
-HELIUS_RPC_URL="https://devnet.helius-rpc.com/?api-key=<your-helius-api-key>"
-SOLANA_NETWORK=devnet
-FEE_WALLET_ADDRESS="<your-fee-wallet-public-key>"
-TREASURY_WALLET="<your-treasury-wallet-public-key>"
-
-# Aggregator APIs
-LIMITLESS_API_URL="https://api.limitless.exchange"
-LIMITLESS_API_KEY=""
-POLYMARKET_API_URL="https://gamma-api.polymarket.com"
-MANIFOLD_API_URL="https://api.manifold.markets/v0"
-HEDGEHOG_API_URL="https://api.hedgehog.markets/v1"
-KALSHI_API_URL="https://api.elections.kalshi.com/trade-api/v2"
-SXBET_API_URL="https://api.sx.bet/markets/active"
-
-# Server
-PORT=3000
-NODE_ENV=development
-
-# Logging
-LOG_LEVEL=info
-
-# Auth (Privy)
-PRIVY_APP_ID="<your-privy-app-id>"
-PRIVY_APP_SECRET="<your-privy-app-secret>"
-
-# Cloudflare R2 (Meme Cards) — optional
-R2_ENDPOINT=
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
-R2_BUCKET_NAME=simpredicts-cards
-
-# App
-APP_URL=http://localhost:5173
-```
-
-</details>
-
-#### Frontend `frontend/.env`
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_BACKEND_URL` | ✅ | Backend API base URL |
-| `VITE_SOLANA_RPC_URL` | ✅ | Solana RPC for frontend transactions |
-| `VITE_PRIVY_APP_ID` | ✅ | Privy app ID (same as backend) |
+**Frontend (`frontend/.env`)**:
+- `VITE_BACKEND_URL`
+- `VITE_SOLANA_RPC_URL`
+- `VITE_PRIVY_APP_ID`
 
 
 ### 3. Set Up Database
