@@ -7,6 +7,7 @@ dist/
 
 # Frontend (runs locally, not on server)
 frontend/
+frontend-1/
 
 # Environment files
 .env
