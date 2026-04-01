@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { PublicKey } from '@solana/web3.js';
 import { PrismaService } from '../../core/config/prisma.service';
 import { RedisService } from '../../core/config/redis.service';
 import { generateToken } from '../../core/config/auth.middleware';
@@ -6,6 +7,9 @@ import { AppError } from '../../core/config/error.handler';
 import { logger } from '../../core/logger/logger';
 
 const NONCE_TTL = 300; // 5 minutes
+const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const BASE58_MAP = new Map(BASE58_ALPHABET.split('').map((char, index) => [char, index]));
 
 export class AuthService {
     private readonly prisma = PrismaService.getInstance();
@@ -44,14 +48,11 @@ export class AuthService {
             throw new AppError('Nonce expired or not found. Request a new nonce.', 401);
         }
 
-        // TODO: V2 — Verify actual Solana signature using nacl/tweetnacl
-        // const message = `SimPredicts Login\nNonce: ${storedNonce}`;
-        // const isValid = nacl.sign.detached.verify(
-        //     new TextEncoder().encode(message),
-        //     base58.decode(signature),
-        //     new PublicKey(wallet).toBytes()
-        // );
-        // if (!isValid) throw new AppError('Invalid signature', 401);
+        const message = `SimPredicts Login\nNonce: ${storedNonce}`;
+        const isValid = this.verifySolanaSignature(wallet, signature, message);
+        if (!isValid) {
+            throw new AppError('Invalid signature', 401);
+        }
 
         // Delete nonce (one-time use)
         await this.redis.del(`auth:nonce:${wallet}`);
@@ -71,5 +72,67 @@ export class AuthService {
 
         logger.info(`User authenticated: ${wallet.slice(0, 8)}...`);
         return { token, user };
+    }
+
+    private verifySolanaSignature(wallet: string, signature: string, message: string): boolean {
+        try {
+            const publicKeyBytes = new PublicKey(wallet).toBytes();
+            const keyObject = crypto.createPublicKey({
+                key: Buffer.concat([ED25519_SPKI_PREFIX, Buffer.from(publicKeyBytes)]),
+                format: 'der',
+                type: 'spki',
+            });
+
+            const signatureBytes = this.decodeBase58(signature);
+            if (signatureBytes.length !== 64) {
+                return false;
+            }
+
+            return crypto.verify(
+                null,
+                Buffer.from(message, 'utf8'),
+                keyObject,
+                signatureBytes,
+            );
+        } catch (error) {
+            logger.warn(`Signature verification failed for ${wallet.slice(0, 8)}...`);
+            return false;
+        }
+    }
+
+    private decodeBase58(value: string): Buffer {
+        if (!value) {
+            throw new Error('Empty base58 value');
+        }
+
+        const bytes: number[] = [];
+        for (const char of value) {
+            const carryValue = BASE58_MAP.get(char);
+            if (carryValue === undefined) {
+                throw new Error('Invalid base58 character');
+            }
+
+            let carry = carryValue;
+            for (let i = 0; i < bytes.length; i++) {
+                const x = bytes[i] * 58 + carry;
+                bytes[i] = x & 0xff;
+                carry = x >> 8;
+            }
+
+            while (carry > 0) {
+                bytes.push(carry & 0xff);
+                carry >>= 8;
+            }
+
+            if (bytes.length === 0) {
+                bytes.push(0);
+            }
+        }
+
+        for (let i = 0; i < value.length && value[i] === '1'; i++) {
+            bytes.push(0);
+        }
+
+        return Buffer.from(bytes.reverse());
     }
 }

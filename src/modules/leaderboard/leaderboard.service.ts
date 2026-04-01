@@ -13,6 +13,8 @@ export interface LeaderboardEntry {
 
 const XP_SORTED_SET_KEY = 'leaderboard:xp:all_time';
 
+type LeaderboardTimeframe = 'all_time' | 'daily' | 'weekly';
+
 export class LeaderboardService {
   private readonly prisma: PrismaService;
   private readonly redis = RedisService.getInstance();
@@ -21,11 +23,13 @@ export class LeaderboardService {
   constructor() {
     this.prisma = PrismaService.getInstance();
   }
-  async getLeaderboard(options: { page?: number; limit?: number; sortBy?: string } = {}) {
+  async getLeaderboard(options: { page?: number; limit?: number; sortBy?: string; timeframe?: string } = {}) {
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const sortBy = options.sortBy || 'totalPnl';
-    const cacheKey = `${this.CACHE_KEY}:${page}:${limit}:${sortBy}`;
+    const timeframe = this.normalizeTimeframe(options.timeframe);
+    const period = this.timeframeToPeriod(timeframe);
+    const cacheKey = `${this.CACHE_KEY}:${period}:${page}:${limit}:${sortBy}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
     const validSortFields = ['totalPnl', 'totalVolume', 'winRate', 'tradeCount', 'streak'];
@@ -39,12 +43,13 @@ export class LeaderboardService {
     const skip = (page - 1) * limit;
     const [entries, total] = await Promise.all([
       this.prisma.leaderboard.findMany({
+        where: { period },
         skip,
         take: limit,
         orderBy: prismaOrder,
         include: { user: true },
       }),
-      this.prisma.leaderboard.count(),
+      this.prisma.leaderboard.count({ where: { period } }),
     ]);
     const ranked: LeaderboardEntry[] = entries.map((entry, idx) => ({
       rank: skip + idx + 1,
@@ -109,7 +114,7 @@ export class LeaderboardService {
   async updateLeaderboard(): Promise<void> {
     logger.info('Updating leaderboard...');
     try {
-      const periods = ['ALL_TIME', 'DAILY', 'WEEKLY'];
+      const periods: Array<{ period: 'ALL_TIME' | 'DAILY' | 'WEEKLY'; tradeFilter: Record<string, unknown>; positionFilter: Record<string, unknown> }> = [];
       const now = new Date();
 
       const dayStart = new Date(now);
@@ -119,53 +124,84 @@ export class LeaderboardService {
       weekStart.setUTCDate(now.getUTCDate() - now.getUTCDay());
       weekStart.setUTCHours(0, 0, 0, 0);
 
-      for (const period of periods) {
-        let dateFilter = {};
-        if (period === 'DAILY') dateFilter = { timestamp: { gte: dayStart } };
-        if (period === 'WEEKLY') dateFilter = { timestamp: { gte: weekStart } };
+      periods.push(
+        { period: 'ALL_TIME', tradeFilter: {}, positionFilter: {} },
+        { period: 'DAILY', tradeFilter: { timestamp: { gte: dayStart } }, positionFilter: { updatedAt: { gte: dayStart } } },
+        { period: 'WEEKLY', tradeFilter: { timestamp: { gte: weekStart } }, positionFilter: { updatedAt: { gte: weekStart } } },
+      );
 
-        const wallets = await this.prisma.trade.groupBy({
-          by: ['walletAddress'],
-          where: dateFilter,
-          _sum: { amount: true },
-          _count: { id: true },
+      for (const { period, tradeFilter, positionFilter } of periods) {
+        const [tradeStats, resolvedStats, winStats] = await Promise.all([
+          this.prisma.trade.groupBy({
+            by: ['walletAddress'],
+            where: tradeFilter,
+            _sum: { amount: true },
+            _count: { id: true },
+          }),
+          this.prisma.position.groupBy({
+            by: ['walletAddress'],
+            where: {
+              status: { in: ['WON', 'LOST'] },
+              ...positionFilter,
+            },
+            _sum: { realizedPnl: true },
+            _count: { _all: true },
+          }),
+          this.prisma.position.groupBy({
+            by: ['walletAddress'],
+            where: {
+              status: 'WON',
+              ...positionFilter,
+            },
+            _count: { _all: true },
+          }),
+        ]);
+
+        const walletSet = new Set<string>();
+        const tradeMap = new Map<string, { totalVolume: number; tradeCount: number }>();
+        const resolvedMap = new Map<string, { totalPnl: number; resolvedCount: number }>();
+        const winMap = new Map<string, number>();
+
+        for (const trade of tradeStats) {
+          walletSet.add(trade.walletAddress);
+          tradeMap.set(trade.walletAddress, {
+            totalVolume: trade._sum.amount || 0,
+            tradeCount: trade._count.id || 0,
+          });
+        }
+
+        for (const resolved of resolvedStats) {
+          walletSet.add(resolved.walletAddress);
+          resolvedMap.set(resolved.walletAddress, {
+            totalPnl: resolved._sum.realizedPnl || 0,
+            resolvedCount: resolved._count._all || 0,
+          });
+        }
+
+        for (const win of winStats) {
+          walletSet.add(win.walletAddress);
+          winMap.set(win.walletAddress, win._count._all || 0);
+        }
+
+        const rows = Array.from(walletSet).map((walletAddress) => {
+          const trade = tradeMap.get(walletAddress);
+          const resolved = resolvedMap.get(walletAddress);
+          const wins = winMap.get(walletAddress) || 0;
+          const resolvedCount = resolved?.resolvedCount || 0;
+
+          return {
+            walletAddress,
+            period,
+            totalVolume: trade?.totalVolume || 0,
+            totalPnl: resolved?.totalPnl || 0,
+            winRate: resolvedCount > 0 ? wins / resolvedCount : 0,
+            tradeCount: trade?.tradeCount || 0,
+          };
         });
 
-        for (const walletData of wallets) {
-          const wallet = walletData.walletAddress;
-          const totalVolume = walletData._sum.amount || 0;
-          const tradeCount = walletData._count.id || 0;
-
-          const positions = await this.prisma.position.findMany({
-            where: { walletAddress: wallet },
-            select: { realizedPnl: true },
-          });
-          const totalPnl = positions.reduce((acc, p) => acc + p.realizedPnl, 0); // Kept all-time for simplicity
-
-          const profitableTrades = await this.prisma.trade.count({
-            where: { walletAddress: wallet, price: { gt: 0 }, ...dateFilter },
-          });
-          const winRate = tradeCount > 0 ? (profitableTrades / tradeCount) * 100 : 0;
-
-          await this.prisma.leaderboard.upsert({
-            where: {
-              walletAddress_period: { walletAddress: wallet, period }
-            },
-            create: {
-              walletAddress: wallet,
-              period,
-              totalVolume,
-              totalPnl,
-              winRate,
-              tradeCount,
-            },
-            update: {
-              totalVolume,
-              totalPnl,
-              winRate,
-              tradeCount,
-            },
-          });
+        await this.prisma.leaderboard.deleteMany({ where: { period } });
+        if (rows.length > 0) {
+          await this.prisma.leaderboard.createMany({ data: rows });
         }
       }
 
@@ -180,5 +216,18 @@ export class LeaderboardService {
       const message = error instanceof Error ? error.message : 'Unknown';
       logger.error(`Leaderboard update failed: ${message}`);
     }
+  }
+
+  private normalizeTimeframe(timeframe?: string): LeaderboardTimeframe {
+    if (timeframe === 'daily' || timeframe === 'weekly') {
+      return timeframe;
+    }
+    return 'all_time';
+  }
+
+  private timeframeToPeriod(timeframe: LeaderboardTimeframe): 'ALL_TIME' | 'DAILY' | 'WEEKLY' {
+    if (timeframe === 'daily') return 'DAILY';
+    if (timeframe === 'weekly') return 'WEEKLY';
+    return 'ALL_TIME';
   }
 }

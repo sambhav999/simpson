@@ -19,7 +19,7 @@ async function bootstrap() {
   const redis = RedisService.getInstance();
 
   await prisma.$connect();
-  logger.info('Connected to PostgreSQL');
+  logger.info('Connected to MongoDB');
   await redis.ping();
   logger.info('Connected to Redis');
 

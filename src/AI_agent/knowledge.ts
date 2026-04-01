@@ -42,7 +42,7 @@ export const KNOWLEDGE_BASE = [
   {
     intent: 'tech_stack',
     keywords: ['tech stack', 'technology', 'how it works', 'prisma', 'node', 'solana', 'react'],
-    answer: "SimPredict is built with a modern stack: Node.js/Express and Prisma (PostgreSQL) on the backend, React 18/Vite on the frontend, and Solana for non-custodial trading. It uses Redis for caching and BullMQ for background jobs."
+    answer: "SimPredict is built with a modern stack: Node.js/Express and Prisma (MongoDB) on the backend, React 18/Vite on the frontend, and Solana for non-custodial trading. It uses Redis for caching and BullMQ for background jobs."
   },
   {
     intent: 'ui_navigation_predictions',

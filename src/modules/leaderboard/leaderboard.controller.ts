@@ -29,11 +29,12 @@ function getAccuracyStatus(winRate: number, totalPredictions: number): string {
 // GET /leaderboard — XP leaderboard (existing, enhanced)
 leaderboardRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page, limit, sortBy } = req.query;
+    const { page, limit, sortBy, timeframe } = req.query;
     const result = await leaderboardService.getLeaderboard({
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       sortBy: sortBy as string | undefined,
+      timeframe: timeframe as string | undefined,
     });
     res.json(result);
   } catch (error) {
@@ -47,7 +48,7 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
     const { timeframe = 'all_time', limit = '100' } = req.query;
     const maxResults = Number(limit);
     const now = new Date();
-    let leaderboard: any[];
+    let fullLeaderboard: any[];
 
     // Fetch ALL users for merging zero-score users
     const allUsers = await prisma.user.findMany({
@@ -71,7 +72,7 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
 
       const scorers = entries.filter(e => e.periodXP > 0).sort((a, b) => b.periodXP - a.periodXP);
       const nonScorers = entries.filter(e => e.periodXP === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      leaderboard = [...scorers, ...nonScorers].slice(0, maxResults);
+      fullLeaderboard = [...scorers, ...nonScorers];
 
     } else if (timeframe === 'weekly') {
       // Weekly: Accumulated XP from last 7 days
@@ -90,7 +91,7 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
 
       const scorers = entries.filter(e => e.periodXP > 0).sort((a, b) => b.periodXP - a.periodXP);
       const nonScorers = entries.filter(e => e.periodXP === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      leaderboard = [...scorers, ...nonScorers].slice(0, maxResults);
+      fullLeaderboard = [...scorers, ...nonScorers];
 
     } else if (timeframe === 'monthly') {
       // Monthly: Accumulated XP from last 30 days
@@ -109,26 +110,32 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
 
       const scorers = entries.filter(e => e.periodXP > 0).sort((a, b) => b.periodXP - a.periodXP);
       const nonScorers = entries.filter(e => e.periodXP === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      leaderboard = [...scorers, ...nonScorers].slice(0, maxResults);
+      fullLeaderboard = [...scorers, ...nonScorers];
 
     } else {
       // all_time: Total XP, zero-score at bottom by createdAt
       const scorers = allUsers.filter(u => u.xpTotal > 0).sort((a, b) => b.xpTotal - a.xpTotal);
       const nonScorers = allUsers.filter(u => u.xpTotal === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      leaderboard = [...scorers, ...nonScorers].slice(0, maxResults);
+      fullLeaderboard = [...scorers, ...nonScorers];
     }
+
+    const leaderboard = fullLeaderboard.slice(0, maxResults);
 
     // Find current user rank via Redis sorted set
     let currentUserRank = null;
-    if (req.user) {
+    if (req.user && timeframe === 'all_time') {
       currentUserRank = await leaderboardService.getUserXPRank(req.user.wallet);
+    }
+    if (req.user && timeframe !== 'all_time') {
+      const fullRank = fullLeaderboard.findIndex((u: any) => u.walletAddress === req.user!.wallet);
+      currentUserRank = fullRank === -1 ? null : fullRank + 1;
     }
 
     const usePeriodXP = timeframe !== 'all_time';
     const showStatus = timeframe === 'all_time';
 
     res.json({
-      total_players: leaderboard.length,
+      total_players: allUsers.length,
       leaderboard: leaderboard.map((u: any, idx: number) => ({
         rank: idx + 1,
         user: {
@@ -209,7 +216,7 @@ leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: Nex
     const showStatus = timeframe === 'all_time';
 
     res.json({
-      total_players: sorted.length,
+      total_players: entries.length,
       leaderboard: sorted.map((l, idx) => ({
         rank: idx + 1,
         user: { id: l.wallet, username: l.user.username, avatar_url: l.user.avatarUrl },

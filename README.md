@@ -24,7 +24,7 @@ This project is a **monorepo** consisting of:
 |-------|-------|-------------|
 | **Frontend** (`/frontend`) | React 18 + Vite + Custom CSS | Glassmorphism SPA with real-time updates |
 | **Backend** (`/src`) | Node.js + Express + Prisma | REST API, WebSocket server, background workers |
-| **Database** | PostgreSQL (via Prisma ORM) | 16 models, optimized indexes |
+| **Database** | MongoDB (via Prisma ORM) | 16 models, optimized indexes |
 | **Cache & Queue** | Redis 7 (IORedis + BullMQ) | High-performance caching & job scheduling |
 | **Blockchain** | Solana (Web3.js + Solana Pay) | Non-custodial trade execution |
 
@@ -100,7 +100,7 @@ simpredict-backend/
 ### Prerequisites
 
 - **Node.js** ≥ 20
-- **PostgreSQL** instance (local or managed)
+- **MongoDB** instance (local or managed)
 - **Redis** instance (local or managed)
 - **Solana RPC** endpoint (e.g., [Helius](https://helius.dev))
 
@@ -251,7 +251,7 @@ For servers with limited cores (2 vCPUs), keep these configurations:
 |----------|-------------|
 | **Backend** | Node.js, Express, TypeScript, Prisma, BullMQ |
 | **Frontend** | React 18, Vite, Custom CSS (Glassmorphism) |
-| **Database** | PostgreSQL, Redis (IORedis) |
+| **Database** | MongoDB, Redis (IORedis) |
 | **Blockchain** | Solana Web3.js, Solana Pay, Pyth Network, DFlow |
 | **Real-Time** | Socket.IO (with Redis adapter) |
 | **Image Gen** | Satori, Resvg, Cloudflare R2 |
@@ -268,7 +268,7 @@ For servers with limited cores (2 vCPUs), keep these configurations:
 | `npm run start:dev` | Start backend with hot reload |
 | `npm run build` | Compile TypeScript |
 | `npm start` | Run production server |
-| `npm run start:render` | Migrate + start (for Render) |
+| `npm run start:render` | Push schema + start (for Render) |
 | `npm run lint` | ESLint fix |
 | `npx prisma studio` | Open Prisma database GUI |
 | `npx prisma db push` | Push schema to database |

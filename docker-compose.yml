@@ -51,7 +51,7 @@ services:
     container_name: simpredict-migrate
     env_file:
       - .env
-    command: ["npx", "prisma", "migrate", "deploy"]
+    command: ["npx", "prisma", "db", "push"]
     restart: "no"
 
 volumes:
