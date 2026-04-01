@@ -7,6 +7,8 @@ export const leaderboardRouter = Router();
 const leaderboardService = new LeaderboardService();
 const prisma = PrismaService.getInstance();
 
+type XPLeaderboardTimeframe = 'daily' | 'weekly' | 'monthly' | 'all_time';
+
 function getRankBadge(xpTotal: number): string {
   if (xpTotal >= 50001) return 'Legendary Baba';
   if (xpTotal >= 10001) return 'Grand Oracle';
@@ -24,6 +26,30 @@ function getAccuracyStatus(winRate: number, totalPredictions: number): string {
   if (winRate >= 0.6) return 'Skilled Predictor';
   if (winRate >= 0.5) return 'Rising Analyst';
   return 'Learning Apprentice';
+}
+
+function normalizeXPTimeframe(value: string): XPLeaderboardTimeframe {
+  if (value === 'daily' || value === 'weekly' || value === 'monthly') {
+    return value;
+  }
+  return 'all_time';
+}
+
+function getTimeframeStart(now: Date, timeframe: Exclude<XPLeaderboardTimeframe, 'all_time'>): Date {
+  const start = new Date(now);
+
+  if (timeframe === 'daily') {
+    start.setUTCHours(0, 0, 0, 0);
+    return start;
+  }
+
+  if (timeframe === 'weekly') {
+    start.setUTCDate(now.getUTCDate() - 7);
+    return start;
+  }
+
+  start.setUTCMonth(now.getUTCMonth() - 1);
+  return start;
 }
 
 // GET /leaderboard — XP leaderboard (existing, enhanced)
@@ -45,7 +71,8 @@ leaderboardRouter.get('/', async (req: Request, res: Response, next: NextFunctio
 // GET /leaderboard/xp — XP leaders (all users including zero-score)
 leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { timeframe = 'all_time', limit = '100' } = req.query;
+    const timeframe = normalizeXPTimeframe(String(req.query.timeframe || 'all_time'));
+    const { limit = '100' } = req.query;
     const maxResults = Number(limit);
     const now = new Date();
     let fullLeaderboard: any[];
@@ -55,67 +82,52 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
       select: { walletAddress: true, username: true, avatarUrl: true, xpTotal: true, createdAt: true },
     });
 
-    if (timeframe === 'daily') {
-      // Daily: XP earned today from XP transactions
-      const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
-      const dailyXP = await prisma.xPTransaction.groupBy({
-        by: ['walletAddress'],
-        where: { createdAt: { gte: dayStart } },
-        _sum: { amount: true },
-      });
-      const xpMap = new Map(dailyXP.map(x => [x.walletAddress, x._sum.amount || 0]));
-
-      const entries = allUsers.map(u => ({
-        ...u,
-        periodXP: xpMap.get(u.walletAddress) || 0,
-      }));
-
-      const scorers = entries.filter(e => e.periodXP > 0).sort((a, b) => b.periodXP - a.periodXP);
-      const nonScorers = entries.filter(e => e.periodXP === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      fullLeaderboard = [...scorers, ...nonScorers];
-
-    } else if (timeframe === 'weekly') {
-      // Weekly: Accumulated XP from last 7 days
-      const weekStart = new Date(now); weekStart.setDate(now.getDate() - 7);
-      const weeklyXP = await prisma.xPTransaction.groupBy({
-        by: ['walletAddress'],
-        where: { createdAt: { gte: weekStart } },
-        _sum: { amount: true },
-      });
-      const xpMap = new Map(weeklyXP.map(x => [x.walletAddress, x._sum.amount || 0]));
-
-      const entries = allUsers.map(u => ({
-        ...u,
-        periodXP: xpMap.get(u.walletAddress) || 0,
-      }));
-
-      const scorers = entries.filter(e => e.periodXP > 0).sort((a, b) => b.periodXP - a.periodXP);
-      const nonScorers = entries.filter(e => e.periodXP === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      fullLeaderboard = [...scorers, ...nonScorers];
-
-    } else if (timeframe === 'monthly') {
-      // Monthly: Accumulated XP from last 30 days
-      const monthStart = new Date(now); monthStart.setMonth(now.getMonth() - 1);
-      const monthlyXP = await prisma.xPTransaction.groupBy({
-        by: ['walletAddress'],
-        where: { createdAt: { gte: monthStart } },
-        _sum: { amount: true },
-      });
-      const xpMap = new Map(monthlyXP.map(x => [x.walletAddress, x._sum.amount || 0]));
-
-      const entries = allUsers.map(u => ({
-        ...u,
-        periodXP: xpMap.get(u.walletAddress) || 0,
-      }));
-
-      const scorers = entries.filter(e => e.periodXP > 0).sort((a, b) => b.periodXP - a.periodXP);
-      const nonScorers = entries.filter(e => e.periodXP === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      fullLeaderboard = [...scorers, ...nonScorers];
-
-    } else {
+    if (timeframe === 'all_time') {
       // all_time: Total XP, zero-score at bottom by createdAt
       const scorers = allUsers.filter(u => u.xpTotal > 0).sort((a, b) => b.xpTotal - a.xpTotal);
       const nonScorers = allUsers.filter(u => u.xpTotal === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      fullLeaderboard = [...scorers, ...nonScorers];
+    } else {
+      const start = getTimeframeStart(now, timeframe);
+      const [periodXP, loginLedger] = await Promise.all([
+        prisma.xPTransaction.groupBy({
+          by: ['walletAddress'],
+          where: { createdAt: { gte: start } },
+          _sum: { amount: true },
+        }),
+        prisma.pointsLedger.findMany({
+          where: {
+            reason: 'daily_login',
+            createdAt: { gte: start },
+          },
+          orderBy: { createdAt: 'asc' },
+          select: { walletAddress: true, createdAt: true },
+        }),
+      ]);
+
+      const xpMap = new Map(periodXP.map((x) => [x.walletAddress, x._sum.amount || 0]));
+      const firstLoginMap = new Map<string, Date>();
+      for (const login of loginLedger) {
+        if (!firstLoginMap.has(login.walletAddress)) {
+          firstLoginMap.set(login.walletAddress, login.createdAt);
+        }
+      }
+
+      const entries = allUsers
+        .filter((u) => firstLoginMap.has(u.walletAddress))
+        .map((u) => ({
+          ...u,
+          periodXP: xpMap.get(u.walletAddress) || 0,
+          firstLoginAt: firstLoginMap.get(u.walletAddress)!,
+        }));
+
+      const scorers = entries
+        .filter((e) => e.periodXP > 0)
+        .sort((a, b) => b.periodXP - a.periodXP || a.firstLoginAt.getTime() - b.firstLoginAt.getTime());
+      const nonScorers = entries
+        .filter((e) => e.periodXP === 0)
+        .sort((a, b) => a.firstLoginAt.getTime() - b.firstLoginAt.getTime());
+
       fullLeaderboard = [...scorers, ...nonScorers];
     }
 
@@ -135,7 +147,7 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
     const showStatus = timeframe === 'all_time';
 
     res.json({
-      total_players: allUsers.length,
+      total_players: fullLeaderboard.length,
       leaderboard: leaderboard.map((u: any, idx: number) => ({
         rank: idx + 1,
         user: {
@@ -158,7 +170,8 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
 // GET /leaderboard/accuracy — Top predictors by win rate (all users including zero-accuracy)
 leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { limit = '100', timeframe = 'all_time' } = req.query;
+    const { limit = '100' } = req.query;
+    const timeframe = normalizeXPTimeframe(String(req.query.timeframe || 'all_time'));
     const maxResults = Number(limit);
     const now = new Date();
 
@@ -166,7 +179,30 @@ leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: Nex
     const allUsers = await prisma.user.findMany({
       select: { walletAddress: true, username: true, avatarUrl: true, currentStreak: true, xpTotal: true, createdAt: true },
     });
-    const allWallets = allUsers.map(u => u.walletAddress);
+    let eligibleUsers = allUsers;
+    let firstLoginMap = new Map<string, Date>();
+
+    if (timeframe !== 'all_time') {
+      const start = getTimeframeStart(now, timeframe);
+      const loginLedger = await prisma.pointsLedger.findMany({
+        where: {
+          reason: 'daily_login',
+          createdAt: { gte: start },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { walletAddress: true, createdAt: true },
+      });
+
+      for (const login of loginLedger) {
+        if (!firstLoginMap.has(login.walletAddress)) {
+          firstLoginMap.set(login.walletAddress, login.createdAt);
+        }
+      }
+
+      eligibleUsers = allUsers.filter((u) => firstLoginMap.has(u.walletAddress));
+    }
+
+    const eligibleWallets = eligibleUsers.map(u => u.walletAddress);
 
     // Build date filter for positions based on timeframe
     let dateFilter: any = {};
@@ -186,19 +222,19 @@ leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: Nex
     const [posResults, winResults] = await Promise.all([
       prisma.position.groupBy({
         by: ['walletAddress'],
-        where: { walletAddress: { in: allWallets }, status: { in: ['WON', 'LOST'] }, ...dateFilter },
+        where: { walletAddress: { in: eligibleWallets }, status: { in: ['WON', 'LOST'] }, ...dateFilter },
         _count: { _all: true },
       }),
       prisma.position.groupBy({
         by: ['walletAddress'],
-        where: { walletAddress: { in: allWallets }, status: 'WON', ...dateFilter },
+        where: { walletAddress: { in: eligibleWallets }, status: 'WON', ...dateFilter },
         _count: { _all: true },
       }),
     ]);
     const totalMap = new Map(posResults.map(r => [r.walletAddress, r._count._all]));
     const winMap = new Map(winResults.map(r => [r.walletAddress, r._count._all]));
 
-    const entries = allUsers.map(u => {
+    const entries = eligibleUsers.map(u => {
       const total = totalMap.get(u.walletAddress) || 0;
       const wins = winMap.get(u.walletAddress) || 0;
       return {
@@ -206,12 +242,17 @@ leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: Nex
         total, wins, losses: total - wins,
         winRate: total > 0 ? wins / total : 0,
         createdAt: u.createdAt,
+        firstLoginAt: firstLoginMap.get(u.walletAddress),
       };
     });
 
     // Scorers (have resolved predictions) sorted by winRate desc, then non-scorers by FCFS
     const scorers = entries.filter(e => e.total > 0).sort((a, b) => b.winRate - a.winRate);
-    const nonScorers = entries.filter(e => e.total === 0).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const nonScorers = entries.filter(e => e.total === 0).sort((a, b) => {
+      const left = timeframe === 'all_time' ? a.createdAt.getTime() : (a.firstLoginAt?.getTime() || 0);
+      const right = timeframe === 'all_time' ? b.createdAt.getTime() : (b.firstLoginAt?.getTime() || 0);
+      return left - right;
+    });
     const sorted = [...scorers, ...nonScorers].slice(0, maxResults);
     const showStatus = timeframe === 'all_time';
 
