@@ -3,13 +3,15 @@ import { z } from 'zod';
 import { PrismaService } from '../../core/config/prisma.service';
 import { requireAuth, optionalAuth } from '../../core/config/auth.middleware';
 
-const router = Router();
+const commentsRouter = Router();
+const followRouter = Router();
+const feedRouter = Router();
 const prisma = PrismaService.getInstance();
 
 // ─── Comments ───────────────────────────────────────────────────────
 
 // POST /api/comments — Create comment
-router.post('/', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+commentsRouter.post('/', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const schema = z.object({
             market_id: z.string(),
@@ -62,7 +64,7 @@ router.post('/', requireAuth, async (req: Request, res: Response, next: NextFunc
 });
 
 // GET /api/comments/market/:marketId — List comments with replies
-router.get('/market/:marketId', async (req: Request, res: Response, next: NextFunction) => {
+commentsRouter.get('/market/:marketId', async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { sort = 'newest', limit = '20', offset = '0' } = req.query;
         const orderBy: any = sort === 'top' ? { upvotes: 'desc' } : sort === 'oldest' ? { createdAt: 'asc' } : { createdAt: 'desc' };
@@ -105,7 +107,7 @@ router.get('/market/:marketId', async (req: Request, res: Response, next: NextFu
 });
 
 // POST /api/comments/:id/upvote
-router.post('/:id/upvote', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+commentsRouter.post('/:id/upvote', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const comment = await prisma.comment.update({
             where: { id: req.params.id },
@@ -142,7 +144,7 @@ router.post('/:id/upvote', requireAuth, async (req: Request, res: Response, next
 // ─── Follow ─────────────────────────────────────────────────────────
 
 // POST /api/follow — Follow user
-router.post('/follow', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+followRouter.post('/', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { following_id } = z.object({ following_id: z.string() }).parse(req.body);
         const wallet = req.user!.wallet;
@@ -177,7 +179,7 @@ router.post('/follow', requireAuth, async (req: Request, res: Response, next: Ne
 });
 
 // DELETE /api/follow/:userId — Unfollow
-router.delete('/follow/:userId', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+followRouter.delete('/:userId', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         await prisma.follow.delete({
             where: {
@@ -196,7 +198,7 @@ router.delete('/follow/:userId', requireAuth, async (req: Request, res: Response
 // ─── Activity Feed ──────────────────────────────────────────────────
 
 // GET /api/feed — Activity feed from followed users
-router.get('/feed', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+feedRouter.get('/', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { limit = '20', offset = '0' } = req.query;
         const wallet = req.user!.wallet;
@@ -246,4 +248,4 @@ function getRankBadge(xpTotal: number): string {
     return 'Apprentice Prophet';
 }
 
-export { router as socialRouter };
+export { commentsRouter, followRouter, feedRouter };

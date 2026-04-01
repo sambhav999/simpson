@@ -18,7 +18,7 @@ import { metricsRouter, apiResponseTime } from './modules/metrics/metrics.contro
 import { authRouter } from './modules/auth/auth.controller';
 import { predictionsRouter } from './modules/predictions/predictions.controller';
 import { adminRouter } from './modules/admin/admin.controller';
-import { socialRouter } from './modules/social/social.controller';
+import { commentsRouter, followRouter, feedRouter } from './modules/social/social.controller';
 import { creatorsRouter } from './modules/creators/creators.controller';
 import { cardsRouter } from './modules/cards/cards.controller';
 import { dailyRouter } from './modules/daily/daily.controller';
@@ -99,9 +99,9 @@ export function buildApp() {
     app.use('/api/auth', authRouter);
     app.use('/api/predictions', predictionsRouter);
     app.use('/api/admin', adminRouter);
-    app.use('/api/comments', socialRouter);
-    app.use('/api/follow', socialRouter);
-    app.use('/api/feed', socialRouter);
+    app.use('/api/comments', commentsRouter);
+    app.use('/api/follow', followRouter);
+    app.use('/api/feed', feedRouter);
     app.use('/api/creators', creatorsRouter);
     app.use('/api/cards', cardsRouter);
     app.use('/api/daily', dailyRouter);
