@@ -91,6 +91,58 @@ export class PredictionsService {
         };
     }
 
+    async getAIScoreboard(timeframe: 'daily' | 'weekly' | 'monthly' | 'all_time' = 'all_time') {
+        const now = new Date();
+        let predictionFilter: any = { resolved: true };
+        let positionFilter: any = { status: { in: ['WON', 'LOST'] } };
+
+        if (timeframe === 'daily') {
+            const start = new Date(now);
+            start.setUTCHours(0, 0, 0, 0);
+            predictionFilter = { ...predictionFilter, createdAt: { gte: start } };
+            positionFilter = { ...positionFilter, updatedAt: { gte: start } };
+        } else if (timeframe === 'weekly') {
+            const start = new Date(now);
+            start.setUTCDate(start.getUTCDate() - 7);
+            predictionFilter = { ...predictionFilter, createdAt: { gte: start } };
+            positionFilter = { ...positionFilter, updatedAt: { gte: start } };
+        } else if (timeframe === 'monthly') {
+            const start = new Date(now);
+            start.setUTCMonth(start.getUTCMonth() - 1);
+            predictionFilter = { ...predictionFilter, createdAt: { gte: start } };
+            positionFilter = { ...positionFilter, updatedAt: { gte: start } };
+        }
+
+        const [homerWins, homerLosses, communityWins, communityLosses] = await Promise.all([
+            this.prisma.aIPrediction.count({ where: { ...predictionFilter, result: 'WIN' } }),
+            this.prisma.aIPrediction.count({ where: { ...predictionFilter, result: 'LOSS' } }),
+            this.prisma.position.count({ where: { ...positionFilter, status: 'WON' } }),
+            this.prisma.position.count({ where: { ...positionFilter, status: 'LOST' } }),
+        ]);
+
+        const homerTotal = homerWins + homerLosses;
+        const communityTotal = communityWins + communityLosses;
+        const homerAccuracy = homerTotal > 0 ? homerWins / homerTotal : 0;
+        const communityAccuracy = communityTotal > 0 ? communityWins / communityTotal : 0;
+
+        return {
+            timeframe,
+            homer_baba: {
+                total_predictions: homerTotal,
+                wins: homerWins,
+                losses: homerLosses,
+                accuracy: homerAccuracy,
+            },
+            community: {
+                total_predictions: communityTotal,
+                wins: communityWins,
+                losses: communityLosses,
+                accuracy: communityAccuracy,
+            },
+            homer_advantage: homerAccuracy - communityAccuracy,
+        };
+    }
+
     /**
      * Track when user clicks "Trade YES/NO" — create position + award XP
      */

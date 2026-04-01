@@ -16,6 +16,21 @@ router.get('/ai', async (req: Request, res: Response, next: NextFunction) => {
     }
 });
 
+// GET /api/predictions/scoreboard — AI vs Community scoreboard
+router.get('/scoreboard', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const timeframe = String(req.query.timeframe || 'all_time');
+        const normalizedTimeframe =
+            timeframe === 'daily' || timeframe === 'weekly' || timeframe === 'monthly'
+                ? timeframe
+                : 'all_time';
+        const data = await predictionsService.getAIScoreboard(normalizedTimeframe);
+        res.json({ status: 'success', data });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST /api/predictions/track — Track user prediction
 router.post('/track', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
