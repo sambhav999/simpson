@@ -3,6 +3,7 @@ import { SolanaService } from '../solana/solana.service';
 import { RedisService } from '../../core/config/redis.service';
 import { logger } from '../../core/logger/logger';
 import { AppError } from '../../core/config/error.handler';
+
 export interface PortfolioPosition {
   marketId: string;
   marketTitle: string;
@@ -35,6 +36,29 @@ export class PortfolioService {
     this.prisma = PrismaService.getInstance();
     this.solana = SolanaService.getInstance();
   }
+
+  private async getMarketMap(marketIds: string[]) {
+    if (marketIds.length === 0) {
+      return new Map<string, { title: string; yesTokenMint: string; noTokenMint: string; image: string | null; category: string; resolved: boolean; resolution: string | null }>();
+    }
+
+    const markets = await this.prisma.market.findMany({
+      where: { id: { in: marketIds } },
+      select: {
+        id: true,
+        title: true,
+        yesTokenMint: true,
+        noTokenMint: true,
+        image: true,
+        category: true,
+        resolved: true,
+        resolution: true,
+      },
+    });
+
+    return new Map(markets.map((market) => [market.id, market]));
+  }
+
   async getPortfolio(walletAddress: string): Promise<PortfolioSummary> {
     if (!this.solana.validatePublicKey(walletAddress)) {
       throw new AppError('Invalid wallet address', 400);
@@ -52,17 +76,19 @@ export class PortfolioService {
     });
     const positions = await this.prisma.position.findMany({
       where: { walletAddress },
-      include: { market: true },
     });
+    const marketMap = await this.getMarketMap([...new Set(positions.map((position) => position.marketId))]);
+
     const portfolioPositions: PortfolioPosition[] = positions
       .filter((p) => p.amount > 0)
       .map((p) => {
-        const side = (p as any).betSide || (p.market.yesTokenMint === p.tokenMint ? 'YES' : 'NO');
+        const market = marketMap.get(p.marketId);
+        const side = (p as any).betSide || (market?.yesTokenMint === p.tokenMint ? 'YES' : 'NO');
         const currentValue = p.amount * p.averageEntryPrice;
         const unrealizedPnl = 0;
         return {
           marketId: p.marketId,
-          marketTitle: p.market.title,
+          marketTitle: market?.title || 'Archived market',
           tokenMint: p.tokenMint,
           side,
           amount: p.amount,
@@ -116,7 +142,6 @@ export class PortfolioService {
           where: { walletAddress, timestamp: { gte: targetDate } },
           orderBy: { timestamp: 'desc' },
           take: 500, // safety limit increased for "every event"
-          include: { market: { select: { title: true, yesTokenMint: true, noTokenMint: true, image: true, category: true, resolved: true, resolution: true } } },
         }),
         this.prisma.xPTransaction.findMany({
           where: { walletAddress, createdAt: { gte: targetDate } },
@@ -129,29 +154,31 @@ export class PortfolioService {
           take: 150,
         })
       ]);
+      const marketMap = await this.getMarketMap([...new Set(trades.map((trade) => trade.marketId))]);
       
       const activities: any[] = [];
       
       trades.forEach(t => {
+        const market = marketMap.get(t.marketId);
         let result = 'PENDING';
-        const side = (t as any).betSide || (t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO');
+        const side = (t as any).betSide || (market?.yesTokenMint === t.tokenMint ? 'YES' : 'NO');
         if ((t as any).status && (t as any).status !== 'SUCCESS') {
           result = (t as any).status;
-        } else if (t.market.resolved) {
-          result = t.market.resolution === side ? 'WIN' : 'LOSS';
+        } else if (market?.resolved) {
+          result = market.resolution === side ? 'WIN' : 'LOSS';
         }
 
         activities.push({
           type: 'TRADE',
           id: t.id,
-          marketTitle: t.market.title,
-          marketImage: (t.market as any).image,
-          tokenSide: (t as any).betSide || (t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO'),
+          marketTitle: market?.title || 'Archived market',
+          marketImage: market?.image || null,
+          tokenSide: (t as any).betSide || (market?.yesTokenMint === t.tokenMint ? 'YES' : 'NO'),
           amount: t.amount,
           price: t.price,
           signature: t.signature,
           timestamp: t.timestamp,
-          resolved: t.market.resolved,
+          resolved: market?.resolved || false,
           result: result
         });
       });
@@ -195,18 +222,19 @@ export class PortfolioService {
         skip,
         take: limit,
         orderBy: { timestamp: 'desc' },
-        include: { market: { select: { title: true, yesTokenMint: true, noTokenMint: true, image: true, category: true } } },
       }),
       this.prisma.trade.count({ where }),
     ]);
+    const marketMap = await this.getMarketMap([...new Set(trades.map((trade) => trade.marketId))]);
+
     return {
       data: trades.map((t) => ({
         ...t,
         type: 'TRADE',
-        marketTitle: t.market.title,
-        marketImage: (t.market as any).image,
-        marketCategory: (t.market as any).category,
-        tokenSide: (t as any).betSide || (t.market.yesTokenMint === t.tokenMint ? 'YES' : 'NO'),
+        marketTitle: marketMap.get(t.marketId)?.title || 'Archived market',
+        marketImage: marketMap.get(t.marketId)?.image || null,
+        marketCategory: marketMap.get(t.marketId)?.category || 'Unknown',
+        tokenSide: (t as any).betSide || (marketMap.get(t.marketId)?.yesTokenMint === t.tokenMint ? 'YES' : 'NO'),
       })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
