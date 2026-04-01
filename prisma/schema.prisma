@@ -12,6 +12,7 @@ model User {
   createdAt             DateTime              @default(now()) @map("created_at")
   currentStreak         Int                   @default(0) @map("current_streak")
   highestStreak         Int                   @default(0) @map("highest_streak")
+  lastLoginAt           DateTime?             @map("last_login_at")
   lastTradeDate         DateTime?             @map("last_trade_date")
   avatarUrl             String?               @map("avatar_url")
   username              String?               @unique
@@ -30,6 +31,7 @@ model User {
   points                Points?
   pointsLedger          PointsLedger[]
   positions             Position[]
+  authLogins            AuthLogin[]
   trades                Trade[]
   userDailyPredictions  UserDailyPrediction[]
   xpTransactions        XPTransaction[]
@@ -250,6 +252,17 @@ model XPTransaction {
   @@index([walletAddress])
   @@index([createdAt])
   @@map("xp_transactions")
+}
+
+model AuthLogin {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  walletAddress String   @map("wallet_address")
+  createdAt     DateTime @default(now()) @map("created_at")
+  user          User     @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+
+  @@index([walletAddress])
+  @@index([createdAt])
+  @@map("auth_logins")
 }
 
 model DailyBattle {

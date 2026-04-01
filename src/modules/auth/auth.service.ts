@@ -31,7 +31,6 @@ export class AuthService {
 
     /**
      * Verify wallet signature and issue JWT
-     * For V1 MVP: we skip actual signature verification and just validate the nonce exists
      */
     async verifyAndLogin(wallet: string, signature: string): Promise<{ token: string; user: any }> {
         if (!wallet || wallet.length < 32 || wallet.length > 44) {
@@ -57,15 +56,28 @@ export class AuthService {
         // Delete nonce (one-time use)
         await this.redis.del(`auth:nonce:${wallet}`);
 
-        // Upsert user
-        const user = await this.prisma.user.upsert({
-            where: { walletAddress: wallet },
-            create: { 
-                walletAddress: wallet,
-                username: `user_${wallet.slice(-6).toLowerCase()}`
-            },
-            update: {},
-        });
+        const loginAt = new Date();
+
+        // Upsert user and record an auth login event for leaderboard time windows
+        const [user] = await this.prisma.$transaction([
+            this.prisma.user.upsert({
+                where: { walletAddress: wallet },
+                create: {
+                    walletAddress: wallet,
+                    username: `user_${wallet.slice(-6).toLowerCase()}`,
+                    lastLoginAt: loginAt,
+                },
+                update: {
+                    lastLoginAt: loginAt,
+                },
+            }),
+            this.prisma.authLogin.create({
+                data: {
+                    walletAddress: wallet,
+                    createdAt: loginAt,
+                },
+            }),
+        ]);
 
         // Generate JWT
         const token = generateToken(wallet);

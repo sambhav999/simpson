@@ -95,17 +95,16 @@ leaderboardRouter.get('/xp', optionalAuth, async (req: Request, res: Response, n
           where: { createdAt: { gte: start } },
           _sum: { amount: true },
         }),
-        prisma.pointsLedger.findMany({
-          where: {
-            reason: 'daily_login',
-            createdAt: { gte: start },
-          },
+        prisma.authLogin.findMany({
+          where: { createdAt: { gte: start } },
           orderBy: { createdAt: 'asc' },
           select: { walletAddress: true, createdAt: true },
         }),
       ]);
 
-      const xpMap = new Map(periodXP.map((x) => [x.walletAddress, x._sum.amount || 0]));
+      const xpMap = new Map<string, number>(
+        periodXP.map((x) => [x.walletAddress, Number(x._sum.amount || 0)])
+      );
       const firstLoginMap = new Map<string, Date>();
       for (const login of loginLedger) {
         if (!firstLoginMap.has(login.walletAddress)) {
@@ -184,11 +183,8 @@ leaderboardRouter.get('/accuracy', async (req: Request, res: Response, next: Nex
 
     if (timeframe !== 'all_time') {
       const start = getTimeframeStart(now, timeframe);
-      const loginLedger = await prisma.pointsLedger.findMany({
-        where: {
-          reason: 'daily_login',
-          createdAt: { gte: start },
-        },
+      const loginLedger = await prisma.authLogin.findMany({
+        where: { createdAt: { gte: start } },
         orderBy: { createdAt: 'asc' },
         select: { walletAddress: true, createdAt: true },
       });
