@@ -110,6 +110,64 @@ marketsRouter.get('/featured', async (_req: Request, res: Response, next: NextFu
   }
 });
 
+// GET /markets/sparkline?ids=a,b,c — recent real trade-derived yes-price history
+marketsRouter.get('/sparkline', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rawIds = String(req.query.ids || '');
+    const ids = rawIds.split(',').map((id) => id.trim()).filter(Boolean).slice(0, 20);
+    if (ids.length === 0) {
+      return res.json({ sparklines: {} });
+    }
+
+    const [markets, trades] = await Promise.all([
+      prisma.market.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, yesPrice: true },
+      }),
+      prisma.trade.findMany({
+        where: {
+          marketId: { in: ids },
+          side: 'BUY',
+          status: 'SUCCESS',
+        },
+        select: {
+          marketId: true,
+          betSide: true,
+          price: true,
+          timestamp: true,
+        },
+        orderBy: { timestamp: 'desc' },
+        take: ids.length * 25,
+      }),
+    ]);
+
+    const marketMap = new Map(markets.map((market) => [market.id, market]));
+    const grouped = new Map<string, number[]>();
+
+    for (const trade of trades.reverse()) {
+      const points = grouped.get(trade.marketId) || [];
+      const rawPrice = typeof trade.price === 'number' ? trade.price : 0;
+      const normalized = rawPrice <= 1 ? rawPrice * 100 : rawPrice;
+      const yesPrice = trade.betSide === 'NO' ? Math.max(0, 100 - normalized) : normalized;
+      points.push(Math.max(0, Math.min(100, Number(yesPrice.toFixed(2)))));
+      grouped.set(trade.marketId, points.slice(-15));
+    }
+
+    const sparklines = Object.fromEntries(ids.map((id) => {
+      const points = grouped.get(id);
+      const fallback = marketMap.get(id)?.yesPrice;
+      const normalizedFallback = typeof fallback === 'number'
+        ? (fallback <= 1 ? fallback * 100 : fallback)
+        : 50;
+      return [id, points && points.length > 0 ? points : [normalizedFallback]];
+    }));
+
+    res.json({ sparklines });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /markets/:id — Market detail with AI prediction
 marketsRouter.get('/:id', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
