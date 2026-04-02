@@ -1,6 +1,7 @@
 import { PrismaService } from '../../core/config/prisma.service';
 import { AggregatedMarket } from '../markets-aggregator/aggregator.service';
 import { logger } from '../../core/logger/logger';
+import crypto from 'crypto';
 export interface MarketFilter {
   status?: string;
   category?: string;
@@ -193,9 +194,9 @@ export class MarketsRepository {
     closesAt: Date;
     liquidity: number;
   }) {
-    const referralCode = Math.random().toString(36).slice(2, 10);
-    const yesTokenMint = `custom_yes_${Math.random().toString(36).slice(2, 12)}`;
-    const noTokenMint = `custom_no_${Math.random().toString(36).slice(2, 12)}`;
+    const referralCode = await this.generateUniqueReferralCode();
+    const yesTokenMint = `custom_yes_${crypto.randomBytes(8).toString('hex')}`;
+    const noTokenMint = `custom_no_${crypto.randomBytes(8).toString('hex')}`;
 
     return this.prisma.$transaction(async (tx) => {
       await tx.user.upsert({
@@ -203,7 +204,6 @@ export class MarketsRepository {
         create: {
           walletAddress: input.walletAddress,
           xpTotal: 0,
-          username: `user_${input.walletAddress.slice(-6).toLowerCase()}`,
         },
         update: {},
       });
@@ -253,7 +253,6 @@ export class MarketsRepository {
         create: {
           walletAddress: input.walletAddress,
           xpTotal: 25,
-          username: `user_${input.walletAddress.slice(-6).toLowerCase()}`,
         },
       });
 
@@ -262,6 +261,22 @@ export class MarketsRepository {
         creatorMarket,
       };
     });
+  }
+
+  private async generateUniqueReferralCode(): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const referralCode = crypto.randomBytes(4).toString('hex');
+      const existing = await this.prisma.creatorMarket.findUnique({
+        where: { referralCode },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return referralCode;
+      }
+    }
+
+    throw new Error('Unable to generate a unique referral code');
   }
 
   private parseNumericString(val?: string): number | undefined {
