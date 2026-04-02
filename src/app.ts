@@ -38,6 +38,7 @@ export function buildApp() {
         'https://zeevano.com',
         'https://www.zeevano.com',
         'https://predex2.netlify.app',
+        'https://effulgent-bonbon-4d43d9.netlify.app',
         'http://localhost:5173',
         'http://localhost:3000',
         config.APP_URL,
