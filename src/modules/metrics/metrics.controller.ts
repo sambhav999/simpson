@@ -1,7 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import client from 'prom-client';
+import { PrismaService } from '../../core/config/prisma.service';
 
 const router = Router();
+const prisma = PrismaService.getInstance();
 
 // Create a Registry
 export const register = new client.Registry();
@@ -44,6 +46,30 @@ router.get('/', async (_req: Request, res: Response) => {
         res.end(await register.metrics());
     } catch (ex) {
         res.status(500).end(ex);
+    }
+});
+
+router.get('/overview', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+        const [marketVolume, totalMarkets, activeUsers, totalPredictions] = await Promise.all([
+            prisma.market.aggregate({
+                _sum: { volume: true },
+            }),
+            prisma.market.count(),
+            prisma.user.count(),
+            prisma.trade.count({
+                where: { side: 'BUY' },
+            }),
+        ]);
+
+        res.json({
+            total_volume: Number(marketVolume._sum.volume || 0),
+            total_markets: totalMarkets,
+            active_users: activeUsers,
+            total_predictions: totalPredictions,
+        });
+    } catch (error) {
+        next(error);
     }
 });
 

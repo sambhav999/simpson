@@ -14,6 +14,43 @@ export class TradesService {
     this.prisma = PrismaService.getInstance();
     this.solana = SolanaService.getInstance();
   }
+  private readonly QUOTE_REUSE_WINDOW_MS = 15_000;
+  private readonly QUOTE_PRICE_TOLERANCE = 0.02;
+  private isCachedQuoteReusable(params: {
+    marketYesPrice?: number | null;
+    marketNoPrice?: number | null;
+    side: 'YES' | 'NO';
+    cachedQuote?: {
+      expectedPrice?: number;
+      unitPrice?: number;
+      fee?: number;
+      total?: number;
+      expiresAt?: number;
+      tokenMint?: string;
+    };
+  }) {
+    const { cachedQuote } = params;
+    if (!cachedQuote) return false;
+
+    const expiresAt = Number(cachedQuote.expiresAt || 0);
+    if (!expiresAt || expiresAt <= Date.now() + 5_000) {
+      return false;
+    }
+    if (expiresAt - Date.now() > this.QUOTE_REUSE_WINDOW_MS) {
+      return false;
+    }
+
+    const cachedPrice = Number(cachedQuote.unitPrice || cachedQuote.expectedPrice || 0);
+    const marketPrice = params.side === 'YES'
+      ? Number(params.marketYesPrice || 0)
+      : Number(params.marketNoPrice || 0);
+
+    if (cachedPrice <= 0 || marketPrice <= 0) {
+      return false;
+    }
+
+    return Math.abs(cachedPrice - marketPrice) <= this.QUOTE_PRICE_TOLERANCE;
+  }
   async getTradeQuote(params: {
     wallet: string;
     marketId: string;
@@ -100,18 +137,49 @@ export class TradesService {
     side: 'YES' | 'NO';
     amount: number;
     reference: string;
+    cachedQuote?: {
+      expectedPrice?: number;
+      unitPrice?: number;
+      fee?: number;
+      total?: number;
+      expiresAt?: number;
+      tokenMint?: string;
+    };
   }) {
     if (!this.solana.validatePublicKey(params.account)) {
       throw new AppError('Invalid user account address', 400);
     }
 
-    // 1. Fetch market and quote to get accurate pricing
-    const quote = await this.getTradeQuote({
-      wallet: params.account,
-      marketId: params.marketId,
-      side: params.side,
-      amount: params.amount
+    const market = await this.prisma.market.findUnique({
+      where: { id: params.marketId },
     });
+    if (!market) {
+      throw new AppError(`Market ${params.marketId} not found`, 404);
+    }
+
+    // Reuse a fresh cached quote when possible; otherwise refetch.
+    const quote = this.isCachedQuoteReusable({
+      marketYesPrice: market.yesPrice,
+      marketNoPrice: market.noPrice,
+      side: params.side,
+      cachedQuote: params.cachedQuote,
+    })
+      ? {
+          serializedTransaction: '',
+          expectedPrice: Number(params.cachedQuote?.expectedPrice || params.cachedQuote?.unitPrice || 0),
+          priceImpact: 0,
+          fee: Number(params.cachedQuote?.fee || 0),
+          expiresAt: Number(params.cachedQuote?.expiresAt || Date.now()),
+          source: 'cache',
+          total: Number(params.cachedQuote?.total || params.amount),
+          tokenMint: params.cachedQuote?.tokenMint,
+        } as any
+      : await this.getTradeQuote({
+          wallet: params.account,
+          marketId: params.marketId,
+          side: params.side,
+          amount: params.amount
+        });
 
     const userPubkey = new PublicKey(params.account);
     const referencePubkey = new PublicKey(params.reference);
@@ -150,7 +218,7 @@ export class TradesService {
       requireAllSignatures: false, // We only build it, the mobile wallet signs it
     });
 
-    logger.info(`Solana Pay Transaction Request built for ${params.account} on market ${params.marketId}`);
+    logger.info(`Solana Pay Transaction Request built for ${params.account} on market ${params.marketId} (${quote.source || 'live'})`);
 
     return {
       transaction: serializedTransaction.toString('base64'),

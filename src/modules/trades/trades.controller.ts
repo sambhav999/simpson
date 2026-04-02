@@ -81,7 +81,17 @@ tradesRouter.get('/pay', (req: Request, res: Response) => {
  */
 tradesRouter.post('/pay', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { account } = req.body as { account: string };
+    const { account, cachedQuote } = req.body as {
+      account: string;
+      cachedQuote?: {
+        expectedPrice?: number;
+        unitPrice?: number;
+        fee?: number;
+        total?: number;
+        expiresAt?: number;
+        tokenMint?: string;
+      };
+    };
     const { reference, marketId, side, amount } = req.query as {
       reference?: string;
       marketId?: string;
@@ -97,6 +107,7 @@ tradesRouter.post('/pay', async (req: Request, res: Response, next: NextFunction
 
     const transactionData = await tradesService.getSolanaPayTransaction({
       account,
+      cachedQuote,
       reference,
       marketId,
       side: side as 'YES' | 'NO',
