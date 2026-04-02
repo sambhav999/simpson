@@ -143,6 +143,9 @@ export class MarketsService {
       { filter: { category: 'Crypto' }, pagination: { page: 1, limit: 20 } },      // Crypto category
       { filter: { category: 'Politics' }, pagination: { page: 1, limit: 20 } },    // Politics category
       { filter: { category: 'Sports' }, pagination: { page: 1, limit: 20 } },      // Sports category
+      { filter: { category: 'Tech' }, pagination: { page: 1, limit: 20 } },        // Tech category
+      { filter: { category: 'Science' }, pagination: { page: 1, limit: 20 } },     // Science category
+      { filter: { category: 'General' }, pagination: { page: 1, limit: 20 } },     // General category
     ];
 
     const version = await this.getCacheVersion();
@@ -168,6 +171,30 @@ export class MarketsService {
     if (lower.includes('sport') || lower.includes('nfl') || lower.includes('nba') || lower.includes('soccer') || lower.includes('football')) return 'Sports';
     if (lower.includes('politic') || lower.includes('election') || lower.includes('vote')) return 'Politics';
     if (lower.includes('hourly') || lower.includes('daily') || lower.includes('weekly')) return 'Crypto'; // Limitless recurring price markets
+    if (
+      lower.includes('tech') ||
+      lower.includes('technology') ||
+      lower.includes('software') ||
+      lower.includes('hardware') ||
+      lower.includes('ai') ||
+      lower.includes('artificial intelligence') ||
+      lower.includes('openai') ||
+      lower.includes('google') ||
+      lower.includes('apple') ||
+      lower.includes('microsoft')
+    ) return 'Tech';
+    if (
+      lower.includes('science') ||
+      lower.includes('research') ||
+      lower.includes('space') ||
+      lower.includes('nasa') ||
+      lower.includes('physics') ||
+      lower.includes('biology') ||
+      lower.includes('chemistry') ||
+      lower.includes('climate') ||
+      lower.includes('medical') ||
+      lower.includes('health')
+    ) return 'Science';
     if (lower.includes('entertainment') || lower.includes('culture') || lower.includes('pop')) return 'Entertainment';
     return 'General';
   }
