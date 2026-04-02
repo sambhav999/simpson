@@ -26,7 +26,7 @@ commentsRouter.post('/', requireAuth, async (req: Request, res: Response, next: 
                 userId: wallet,
                 marketId: market_id,
                 text,
-                parentId: parent_id,
+                parentId: parent_id ?? null,
             },
             include: {
                 user: { select: { walletAddress: true, username: true, avatarUrl: true, xpTotal: true } },
@@ -70,7 +70,13 @@ commentsRouter.get('/market/:marketId', async (req: Request, res: Response, next
         const orderBy: any = sort === 'top' ? { upvotes: 'desc' } : sort === 'oldest' ? { createdAt: 'asc' } : { createdAt: 'desc' };
 
         const comments = await prisma.comment.findMany({
-            where: { marketId: req.params.marketId, parentId: null },
+            where: {
+                marketId: req.params.marketId,
+                OR: [
+                    { parentId: null },
+                    { parentId: { isSet: false } as any },
+                ],
+            },
             include: {
                 user: { select: { walletAddress: true, username: true, avatarUrl: true, xpTotal: true } },
                 replies: {
