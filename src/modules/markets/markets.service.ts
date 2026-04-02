@@ -83,6 +83,24 @@ export class MarketsService {
     return market;
   }
 
+  async createCustomMarket(input: {
+    walletAddress: string;
+    title: string;
+    description?: string;
+    category: string;
+    closesAt: Date;
+    liquidity: number;
+  }) {
+    const now = new Date();
+    if (input.closesAt.getTime() <= now.getTime()) {
+      throw new AppError('Market close date must be in the future', 400);
+    }
+
+    const market = await this.repository.createCustomMarket(input);
+    await this.invalidateTargetedCache([market.id]);
+    return market;
+  }
+
   async syncMarketsFromAggregator(): Promise<{ created: number; updated: number }> {
     logger.info('Syncing markets from Aggregator Sources...');
     const rawMarkets = await this.aggregator.getMarkets();

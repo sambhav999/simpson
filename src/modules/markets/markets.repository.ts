@@ -185,6 +185,85 @@ export class MarketsRepository {
     });
   }
 
+  async createCustomMarket(input: {
+    walletAddress: string;
+    title: string;
+    description?: string;
+    category: string;
+    closesAt: Date;
+    liquidity: number;
+  }) {
+    const referralCode = Math.random().toString(36).slice(2, 10);
+    const yesTokenMint = `custom_yes_${Math.random().toString(36).slice(2, 12)}`;
+    const noTokenMint = `custom_no_${Math.random().toString(36).slice(2, 12)}`;
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.user.upsert({
+        where: { walletAddress: input.walletAddress },
+        create: {
+          walletAddress: input.walletAddress,
+          xpTotal: 0,
+          username: `user_${input.walletAddress.slice(-6).toLowerCase()}`,
+        },
+        update: {},
+      });
+
+      const market = await tx.market.create({
+        data: {
+          title: input.title,
+          description: input.description || '',
+          category: input.category,
+          yesTokenMint,
+          noTokenMint,
+          closesAt: input.closesAt,
+          expiry: input.closesAt,
+          status: 'active',
+          source: 'simpredict',
+          volume: 0,
+          liquidity: input.liquidity,
+          yesPrice: 0.5,
+          noPrice: 0.5,
+          resolved: false,
+        },
+      });
+
+      const creatorMarket = await tx.creatorMarket.create({
+        data: {
+          creatorId: input.walletAddress,
+          marketId: market.id,
+          caption: input.description || `Hosted by ${input.walletAddress.slice(0, 6)}...${input.walletAddress.slice(-4)}`,
+          referralCode,
+        },
+      });
+
+      await tx.xPTransaction.create({
+        data: {
+          walletAddress: input.walletAddress,
+          amount: 25,
+          reason: 'market_hosted',
+          metadata: { market_id: market.id },
+        },
+      });
+
+      await tx.user.upsert({
+        where: { walletAddress: input.walletAddress },
+        update: {
+          xpTotal: { increment: 25 },
+        },
+        create: {
+          walletAddress: input.walletAddress,
+          xpTotal: 25,
+          username: `user_${input.walletAddress.slice(-6).toLowerCase()}`,
+        },
+      });
+
+      return {
+        ...market,
+        creatorMarket,
+      };
+    });
+  }
+
   private parseNumericString(val?: string): number | undefined {
     if (!val) return undefined;
     // Remove currency symbols, commas, and other non-numeric chars except .

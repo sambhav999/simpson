@@ -2,7 +2,8 @@
 import { MarketsService } from './markets.service';
 import { PrismaService } from '../../core/config/prisma.service';
 import { AppError } from '../../core/config/error.handler';
-import { optionalAuth } from '../../core/config/auth.middleware';
+import { optionalAuth, requireAuth } from '../../core/config/auth.middleware';
+import { z } from 'zod';
 
 export const marketsRouter = Router();
 const marketsService = new MarketsService();
@@ -65,6 +66,42 @@ marketsRouter.get('/', async (req: Request, res: Response, next: NextFunction) =
     res.json({
       data: result.data.map(mapMarketForFrontend),
       pagination: result.pagination,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+marketsRouter.post('/', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const schema = z.object({
+      question: z.string().min(10).max(200),
+      description: z.string().max(1000).optional().default(''),
+      category: z.string().min(2).max(50),
+      closes_at: z.string().datetime(),
+      liquidity: z.coerce.number().positive().max(1_000_000),
+    });
+
+    const body = schema.parse(req.body);
+    const created = await marketsService.createCustomMarket({
+      walletAddress: req.user!.wallet,
+      title: body.question.trim(),
+      description: body.description?.trim() || '',
+      category: body.category.trim(),
+      closesAt: new Date(body.closes_at),
+      liquidity: body.liquidity,
+    });
+
+    res.status(201).json({
+      data: {
+        ...mapMarketForFrontend(created),
+        creator: created.creatorMarket ? {
+          id: req.user!.wallet,
+          username: null,
+          caption: created.creatorMarket.caption,
+          referral_code: created.creatorMarket.referralCode,
+        } : null,
+      },
     });
   } catch (error) {
     next(error);
