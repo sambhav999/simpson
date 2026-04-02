@@ -89,6 +89,13 @@ export class ResolutionService {
     }
 
     const sourceSuggestion = await this.getResolutionSuggestionForMarket(market);
+    const latestAi = market.aiPredictions[0];
+    const normalizedYes = typeof market.yesPrice === 'number' ? (market.yesPrice <= 1 ? market.yesPrice * 100 : market.yesPrice) : 50;
+    const normalizedNo = typeof market.noPrice === 'number' ? (market.noPrice <= 1 ? market.noPrice * 100 : market.noPrice) : 100 - normalizedYes;
+    const sourceSummary = market.sourceUrl
+      ? `Primary source URL is configured and can be used as the evidence trail: ${market.sourceUrl}.`
+      : `No direct source URL is stored, so resolution leans on linked source feed data, title-based oracle rules, or AI guidance.`;
+
     if (sourceSuggestion.outcome) {
       return {
         marketId: market.id,
@@ -97,10 +104,14 @@ export class ResolutionService {
         rationale: sourceSuggestion.rationale,
         method: sourceSuggestion.method,
         admin_confirmation_required: true,
+        source_summary: sourceSummary,
+        contradiction_check: latestAi && latestAi.prediction !== sourceSuggestion.outcome
+          ? `Latest AI prediction points to ${latestAi.prediction}, which conflicts with the deterministic source-backed suggestion.`
+          : 'No direct contradiction was found between the latest AI signal and the source-backed resolution path.',
+        dispute_risk: latestAi && latestAi.prediction !== sourceSuggestion.outcome ? 'medium' : 'low',
       };
     }
 
-    const latestAi = market.aiPredictions[0];
     if (latestAi) {
       return {
         marketId: market.id,
@@ -109,6 +120,9 @@ export class ResolutionService {
         rationale: latestAi.commentary || latestAi.summaryCommentary || 'Latest AI Oracle prediction used as suggestion.',
         method: 'ai_prediction',
         admin_confirmation_required: true,
+        source_summary: sourceSummary,
+        contradiction_check: `Current market pricing is ${Math.round(normalizedYes)}% YES / ${Math.round(normalizedNo)}% NO, while the latest AI call points to ${latestAi.prediction}.`,
+        dispute_risk: latestAi.confidence >= 80 ? 'medium' : 'high',
       };
     }
 
@@ -124,6 +138,9 @@ export class ResolutionService {
       rationale: `No source-backed resolution signal was found, so this suggestion falls back to current market-implied probability (${Math.round(yesPrice)}% YES / ${Math.round(noPrice)}% NO).`,
       method: 'market_probabilities',
       admin_confirmation_required: true,
+      source_summary: sourceSummary,
+      contradiction_check: 'No AI prediction or deterministic source result is available, so this remains a weak fallback suggestion.',
+      dispute_risk: 'high',
     };
   }
 

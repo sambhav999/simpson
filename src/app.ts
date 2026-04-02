@@ -23,6 +23,7 @@ import { creatorsRouter } from './modules/creators/creators.controller';
 import { cardsRouter } from './modules/cards/cards.controller';
 import { dailyRouter } from './modules/daily/daily.controller';
 import { assistantRouter } from './modules/assistant/assistant.controller';
+import { aiRouter } from './modules/ai/ai.controller';
 import { errorHandler } from './core/config/error.handler';
 import { config } from './core/config/config';
 
@@ -106,6 +107,7 @@ export function buildApp() {
     app.use('/api/cards', cardsRouter);
     app.use('/api/daily', dailyRouter);
     app.use('/api/assistant', assistantRouter);
+    app.use('/api/ai', aiRouter);
 
     app.use(errorHandler);
 
