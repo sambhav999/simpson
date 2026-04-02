@@ -1,9 +1,14 @@
 ﻿import {
-  Connection,
-  PublicKey,
-  ParsedTransactionWithMeta,
-  ConfirmedSignatureInfo,
   Commitment,
+  ConfirmedSignatureInfo,
+  Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  ParsedTransactionWithMeta,
+  PublicKey,
+  sendAndConfirmTransaction,
+  SystemProgram,
+  Transaction,
 } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
@@ -34,6 +39,7 @@ export class SolanaService {
   private readonly COMMITMENT: Commitment = 'confirmed';
   private readonly MAX_RETRIES = 3;
   private readonly RETRY_DELAY_MS = 1000;
+  private treasuryKeypair: Keypair | null = null;
   constructor() {
     this.connection = new Connection(config.HELIUS_RPC_URL, {
       commitment: this.COMMITMENT,
@@ -48,6 +54,40 @@ export class SolanaService {
   }
   getConnection(): Connection {
     return this.connection;
+  }
+  async sendTreasuryPayout(toWalletAddress: string, amountSol: number): Promise<string> {
+    if (amountSol <= 0) {
+      throw new AppError('Treasury payout amount must be positive', 400);
+    }
+
+    const treasury = this.getTreasuryKeypair();
+    const destination = this.parsePublicKey(toWalletAddress);
+    const lamports = Math.round(amountSol * LAMPORTS_PER_SOL);
+    if (lamports <= 0) {
+      throw new AppError('Treasury payout amount is too small after lamport conversion', 400);
+    }
+
+    const { blockhash } = await this.connection.getLatestBlockhash(this.COMMITMENT);
+    const transaction = new Transaction({
+      recentBlockhash: blockhash,
+      feePayer: treasury.publicKey,
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: treasury.publicKey,
+        toPubkey: destination,
+        lamports,
+      })
+    );
+
+    const signature = await sendAndConfirmTransaction(
+      this.connection,
+      transaction,
+      [treasury],
+      { commitment: this.COMMITMENT }
+    );
+
+    logger.info(`Treasury payout sent: ${amountSol} SOL to ${toWalletAddress} (${signature})`);
+    return signature;
   }
   async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     const wallet = this.parsePublicKey(walletAddress);
@@ -196,6 +236,33 @@ export class SolanaService {
     } catch {
       throw new AppError(`Invalid public key: ${address}`, 400);
     }
+  }
+  private getTreasuryKeypair(): Keypair {
+    if (this.treasuryKeypair) {
+      return this.treasuryKeypair;
+    }
+    if (!config.TREASURY_PRIVATE_KEY) {
+      throw new AppError('TREASURY_PRIVATE_KEY is not configured', 500);
+    }
+
+    let secret: number[];
+    try {
+      const parsed = JSON.parse(config.TREASURY_PRIVATE_KEY);
+      if (!Array.isArray(parsed) || parsed.some((value) => !Number.isInteger(value) || value < 0 || value > 255)) {
+        throw new Error('invalid secret key format');
+      }
+      secret = parsed;
+    } catch {
+      throw new AppError('TREASURY_PRIVATE_KEY must be a JSON array of bytes', 500);
+    }
+
+    const keypair = Keypair.fromSecretKey(Uint8Array.from(secret));
+    if (config.TREASURY_WALLET && keypair.publicKey.toBase58() !== config.TREASURY_WALLET) {
+      throw new AppError('TREASURY_PRIVATE_KEY does not match TREASURY_WALLET', 500);
+    }
+
+    this.treasuryKeypair = keypair;
+    return keypair;
   }
   private async withRetry<T>(fn: () => Promise<T>, retries = this.MAX_RETRIES): Promise<T> {
     let lastError: Error = new Error('Unknown error');

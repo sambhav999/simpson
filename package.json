@@ -14,6 +14,7 @@
     "prisma:migrate": "prisma db push",
     "prisma:studio": "prisma studio",
     "prisma:push": "prisma db push",
+    "check:treasury-payout": "npm run build && node dist/scripts/check-treasury-payout.js",
     "fix:market-duplicate": "node src/scripts/fix-duplicate-market-external-id.js",
     "start:pm2": "pm2 start ecosystem.config.js --env production",
     "stop:pm2": "pm2 stop ecosystem.config.js",

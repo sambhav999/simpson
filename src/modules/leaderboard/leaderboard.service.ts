@@ -134,7 +134,10 @@ export class LeaderboardService {
         const [tradeStats, resolvedStats, winStats] = await Promise.all([
           this.prisma.trade.groupBy({
             by: ['walletAddress'],
-            where: tradeFilter,
+            where: {
+              ...tradeFilter,
+              side: { in: ['BUY', 'SELL'] },
+            },
             _sum: { amount: true },
             _count: { id: true },
           }),

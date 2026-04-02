@@ -9,6 +9,7 @@ export interface PortfolioPosition {
   marketTitle: string;
   tokenMint: string;
   side: 'YES' | 'NO';
+  status: string;
   amount: number;
   averageEntryPrice: number;
   currentValue: number;
@@ -79,18 +80,18 @@ export class PortfolioService {
     });
     const marketMap = await this.getMarketMap([...new Set(positions.map((position) => position.marketId))]);
 
-    const portfolioPositions: PortfolioPosition[] = positions
-      .filter((p) => p.amount > 0)
-      .map((p) => {
+    const portfolioPositions: PortfolioPosition[] = positions.map((p) => {
         const market = marketMap.get(p.marketId);
         const side = (p as any).betSide || (market?.yesTokenMint === p.tokenMint ? 'YES' : 'NO');
-        const currentValue = p.amount * p.averageEntryPrice;
+        const isResolved = p.status === 'WON' || p.status === 'LOST';
+        const currentValue = isResolved ? 0 : p.amount * p.averageEntryPrice;
         const unrealizedPnl = 0;
         return {
           marketId: p.marketId,
           marketTitle: market?.title || 'Archived market',
           tokenMint: p.tokenMint,
           side,
+          status: p.status,
           amount: p.amount,
           averageEntryPrice: p.averageEntryPrice,
           currentValue,
@@ -112,9 +113,9 @@ export class PortfolioService {
 
     const summary: PortfolioSummary = {
       walletAddress,
-      totalPositions: portfolioPositions.length,
+      totalPositions: positions.length,
       totalValue: portfolioPositions.reduce((acc, p) => acc + p.currentValue, 0),
-      totalRealizedPnl: portfolioPositions.reduce((acc, p) => acc + p.realizedPnl, 0),
+      totalRealizedPnl: positions.reduce((acc, p) => acc + p.realizedPnl, 0),
       totalUnrealizedPnl: portfolioPositions.reduce((acc, p) => acc + p.unrealizedPnl, 0),
       positions: portfolioPositions,
       xpTotal: user?.xpTotal || 0,

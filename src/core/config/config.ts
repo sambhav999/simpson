@@ -16,6 +16,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.string().default('info'),
   TREASURY_WALLET: z.string().optional(),
+  TREASURY_PRIVATE_KEY: z.string().optional(),
+  TREASURY_PAYOUT_MULTIPLIER: z.coerce.number().positive().default(1),
 
   // Auth
   JWT_SECRET: z.string().default('dev-secret-change-in-production'),

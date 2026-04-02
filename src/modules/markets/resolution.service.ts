@@ -1,18 +1,22 @@
 
 import { PrismaService } from '../../core/config/prisma.service';
+import { config } from '../../core/config/config';
 import { logger } from '../../core/logger/logger';
 import { PriceOracleService } from './price-oracle.service';
 import { AggregatorService } from '../markets-aggregator/aggregator.service';
+import { SolanaService } from '../solana/solana.service';
 
 export class ResolutionService {
   private readonly prisma: PrismaService;
   private readonly oracle: PriceOracleService;
   private readonly aggregator: AggregatorService;
+  private readonly solana: SolanaService;
 
   constructor() {
     this.prisma = PrismaService.getInstance();
     this.oracle = new PriceOracleService();
     this.aggregator = new AggregatorService();
+    this.solana = SolanaService.getInstance();
   }
 
   /**
@@ -74,52 +78,26 @@ export class ResolutionService {
         return side !== outcome;
       });
 
-      // 1. Bulk Update Positions
-      if (winPos.length > 0) {
-          await this.prisma.position.updateMany({
-              where: { id: { in: winPos.map(p => p.id) } },
-              data: { status: 'WON' }
-          });
-      }
-      if (lossPos.length > 0) {
-          await this.prisma.position.updateMany({
-              where: { id: { in: lossPos.map(p => p.id) } },
-              data: { status: 'LOST' }
-          });
+      for (const position of winPos) {
+        await this.settleWinningPosition(market, position, outcome);
       }
 
-      // 2. Update XP and Streaks in Batches
-      const XP_BATCH_SIZE = 50;
-      
-      // Handle Wins
-      for (let i = 0; i < winPos.length; i += XP_BATCH_SIZE) {
-          const batch = winPos.slice(i, i + XP_BATCH_SIZE);
-          await this.prisma.$transaction(batch.map(pos => [
-              this.prisma.xPTransaction.create({
-                  data: {
-                      walletAddress: pos.walletAddress,
-                      amount: 50,
-                      reason: 'prediction_win',
-                      metadata: { market_id: market.id, position_id: pos.id }
-                  }
-              }),
-              this.prisma.user.update({
-                  where: { walletAddress: pos.walletAddress },
-                  data: { xpTotal: { increment: 50 }, currentStreak: { increment: 1 } }
-              })
-          ]).flat());
+      for (const position of lossPos) {
+        await this.prisma.position.update({
+          where: { id: position.id },
+          data: {
+            amount: 0,
+            status: 'LOST',
+          },
+        });
       }
 
-      // Handle Losses (Streak Reset) - Can be bulked if we use updateMany on Users
-      // but currentStreak reset is specific to users who LOST on this specific market.
-      // Small optimization: only update users once if they had multiple positions.
-      const lossWallets = Array.from(new Set(lossPos.map(p => p.walletAddress)));
-      for (let i = 0; i < lossWallets.length; i += XP_BATCH_SIZE) {
-          const batch = lossWallets.slice(i, i + XP_BATCH_SIZE);
-          await this.prisma.user.updateMany({
-              where: { walletAddress: { in: batch } },
-              data: { currentStreak: 0 }
-          });
+      const lossWallets = Array.from(new Set(lossPos.map((position) => position.walletAddress)));
+      if (lossWallets.length > 0) {
+        await this.prisma.user.updateMany({
+          where: { walletAddress: { in: lossWallets } },
+          data: { currentStreak: 0 },
+        });
       }
 
       resolvedCount += market.positions.length;
@@ -137,5 +115,67 @@ export class ResolutionService {
 
     logger.info(`[ResolutionService] Successfully resolved ${resolvedCount} positions.`);
     return { resolvedPositions: resolvedCount };
+  }
+
+  private async settleWinningPosition(market: any, position: any, outcome: string): Promise<void> {
+    const payoutAmount = Number((position.amount * config.TREASURY_PAYOUT_MULTIPLIER).toFixed(9));
+    const costBasis = Number((position.amount * position.averageEntryPrice).toFixed(9));
+    const realizedPnl = Number((payoutAmount - costBasis).toFixed(9));
+    const side = position.betSide || position.side || (position.tokenMint === market.yesTokenMint ? 'YES' : 'NO');
+
+    let payoutSignature: string | null = null;
+    if (payoutAmount > 0) {
+      payoutSignature = await this.solana.sendTreasuryPayout(position.walletAddress, payoutAmount);
+    } else {
+      logger.warn(`[ResolutionService] Skipping zero-amount payout for position ${position.id}`);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.position.update({
+        where: { id: position.id },
+        data: {
+          amount: 0,
+          realizedPnl,
+          status: 'WON',
+        },
+      }),
+      this.prisma.trade.create({
+        data: {
+          walletAddress: position.walletAddress,
+          marketId: market.id,
+          tokenMint: position.tokenMint,
+          side: 'PAYOUT',
+          betSide: side,
+          price: 1,
+          amount: payoutAmount,
+          fee: 0,
+          signature: payoutSignature || `payout_${market.id}_${position.id}`,
+          status: payoutSignature ? 'SUCCESS' : 'SIMULATED_PAYOUT',
+          timestamp: new Date(),
+        },
+      }),
+      this.prisma.xPTransaction.create({
+        data: {
+          walletAddress: position.walletAddress,
+          amount: 50,
+          reason: 'prediction_win',
+          metadata: {
+            market_id: market.id,
+            position_id: position.id,
+            payout_amount: payoutAmount,
+            payout_signature: payoutSignature,
+            outcome,
+          },
+        },
+      }),
+      this.prisma.user.update({
+        where: { walletAddress: position.walletAddress },
+        data: { xpTotal: { increment: 50 }, currentStreak: { increment: 1 } },
+      }),
+    ]);
+
+    logger.info(
+      `[ResolutionService] Paid ${payoutAmount} SOL to ${position.walletAddress} for market ${market.id}`
+    );
   }
 }
