@@ -193,38 +193,43 @@ export class AdminService {
         };
     }
 
-    async manuallyResolveMarket(marketId: string, outcome: 'YES' | 'NO', note?: string) {
+    async manuallyResolveMarketAsCreator(walletAddress: string, marketId: string, outcome: 'YES' | 'NO', note?: string) {
         const market = await this.prisma.market.findUnique({ where: { id: marketId } });
         if (!market) throw new AppError('Market not found', 404);
+        await this.assertCreatorAccess(walletAddress, marketId);
 
         const result = await this.resolutionService.resolveMarketById(marketId, outcome);
-        logger.info(`[AdminService] Market ${marketId} manually resolved to ${outcome}${note ? ` (${note})` : ''}`);
+        logger.info(`[AdminService] Market ${marketId} manually resolved by ${walletAddress} to ${outcome}${note ? ` (${note})` : ''}`);
 
         return {
             ...result,
-            method: 'manual_admin',
+            method: 'manual_creator',
             note: note || null,
+            resolved_by: walletAddress,
         };
     }
 
-    async resolveMarketFromSource(marketId: string) {
+    async resolveMarketFromSourceAsCreator(walletAddress: string, marketId: string) {
+        await this.assertCreatorAccess(walletAddress, marketId);
         const suggestion = await this.resolutionService.getResolutionSuggestion(marketId);
         if (!suggestion.outcome || !['source_feed', 'source_url', 'oracle_title'].includes(suggestion.method)) {
             throw new AppError('No deterministic source-backed resolution available for this market yet', 400);
         }
 
         const result = await this.resolutionService.resolveMarketById(marketId, suggestion.outcome as 'YES' | 'NO');
-        logger.info(`[AdminService] Market ${marketId} resolved from ${suggestion.method} as ${suggestion.outcome}`);
+        logger.info(`[AdminService] Market ${marketId} resolved from ${suggestion.method} by ${walletAddress} as ${suggestion.outcome}`);
 
         return {
             ...result,
             method: suggestion.method,
             confidence: suggestion.confidence,
             rationale: suggestion.rationale,
+            resolved_by: walletAddress,
         };
     }
 
-    async getAIMarketResolutionSuggestion(marketId: string) {
+    async getAIMarketResolutionSuggestionForCreator(walletAddress: string, marketId: string) {
+        await this.assertCreatorAccess(walletAddress, marketId);
         const market = await this.prisma.market.findUnique({
             where: { id: marketId },
             select: { id: true, title: true, sourceUrl: true, source: true, closesAt: true, resolved: true, resolution: true },
@@ -245,6 +250,20 @@ export class AdminService {
             suggestion,
             next_step: 'Review the suggestion and confirm with POST /api/admin/markets/:id/resolve',
         };
+    }
+
+    private async assertCreatorAccess(walletAddress: string, marketId: string) {
+        const creatorLink = await this.prisma.creatorMarket.findFirst({
+            where: {
+                creatorId: walletAddress,
+                marketId,
+            },
+            select: { id: true },
+        });
+
+        if (!creatorLink) {
+            throw new AppError('Only the creator of this market can resolve it manually', 403);
+        }
     }
 
     private async awardXP(wallet: string, amount: number, reason: string, metadata?: any) {

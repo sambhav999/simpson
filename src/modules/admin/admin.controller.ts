@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { AdminService } from './admin.service';
+import { requireAuth } from '../../core/config/auth.middleware';
 
 const router = Router();
 const adminService = new AdminService();
@@ -37,32 +38,32 @@ router.post('/predictions', async (req: Request, res: Response, next: NextFuncti
     }
 });
 
-router.get('/markets/:id/resolve-suggestion', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/markets/:id/resolve-suggestion', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const result = await adminService.getAIMarketResolutionSuggestion(req.params.id);
+        const result = await adminService.getAIMarketResolutionSuggestionForCreator(req.user!.wallet, req.params.id);
         res.json(result);
     } catch (err) {
         next(err);
     }
 });
 
-router.post('/markets/:id/resolve', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/markets/:id/resolve', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const schema = z.object({
             outcome: z.enum(['YES', 'NO']),
             note: z.string().max(280).optional(),
         });
         const body = schema.parse(req.body);
-        const result = await adminService.manuallyResolveMarket(req.params.id, body.outcome, body.note);
+        const result = await adminService.manuallyResolveMarketAsCreator(req.user!.wallet, req.params.id, body.outcome, body.note);
         res.json(result);
     } catch (err) {
         next(err);
     }
 });
 
-router.post('/markets/:id/resolve-from-source', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/markets/:id/resolve-from-source', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const result = await adminService.resolveMarketFromSource(req.params.id);
+        const result = await adminService.resolveMarketFromSourceAsCreator(req.user!.wallet, req.params.id);
         res.json(result);
     } catch (err) {
         next(err);
