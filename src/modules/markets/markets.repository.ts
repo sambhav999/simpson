@@ -193,6 +193,7 @@ export class MarketsRepository {
     category: string;
     closesAt: Date;
     liquidity: number;
+    sourceUrl?: string;
   }) {
     const referralCode = await this.generateUniqueReferralCode();
     const yesTokenMint = `custom_yes_${crypto.randomBytes(8).toString('hex')}`;
@@ -219,6 +220,7 @@ export class MarketsRepository {
           expiry: input.closesAt,
           status: 'active',
           source: 'simpredict',
+          sourceUrl: input.sourceUrl || null,
           volume: 0,
           liquidity: input.liquidity,
           yesPrice: 0.5,

@@ -1,9 +1,11 @@
 import { PrismaService } from '../../core/config/prisma.service';
 import { AppError } from '../../core/config/error.handler';
 import { logger } from '../../core/logger/logger';
+import { ResolutionService } from '../markets/resolution.service';
 
 export class AdminService {
     private readonly prisma = PrismaService.getInstance();
+    private readonly resolutionService = new ResolutionService();
 
     /**
      * Get markets that don't have Homer Baba predictions yet
@@ -188,6 +190,60 @@ export class AdminService {
             homer_score: `${homerScore}/${totalMarkets}`,
             users_who_beat_homer: usersWhoBeatHomer,
             perfect_scores: perfectScores,
+        };
+    }
+
+    async manuallyResolveMarket(marketId: string, outcome: 'YES' | 'NO', note?: string) {
+        const market = await this.prisma.market.findUnique({ where: { id: marketId } });
+        if (!market) throw new AppError('Market not found', 404);
+
+        const result = await this.resolutionService.resolveMarketById(marketId, outcome);
+        logger.info(`[AdminService] Market ${marketId} manually resolved to ${outcome}${note ? ` (${note})` : ''}`);
+
+        return {
+            ...result,
+            method: 'manual_admin',
+            note: note || null,
+        };
+    }
+
+    async resolveMarketFromSource(marketId: string) {
+        const suggestion = await this.resolutionService.getResolutionSuggestion(marketId);
+        if (!suggestion.outcome || !['source_feed', 'source_url', 'oracle_title'].includes(suggestion.method)) {
+            throw new AppError('No deterministic source-backed resolution available for this market yet', 400);
+        }
+
+        const result = await this.resolutionService.resolveMarketById(marketId, suggestion.outcome as 'YES' | 'NO');
+        logger.info(`[AdminService] Market ${marketId} resolved from ${suggestion.method} as ${suggestion.outcome}`);
+
+        return {
+            ...result,
+            method: suggestion.method,
+            confidence: suggestion.confidence,
+            rationale: suggestion.rationale,
+        };
+    }
+
+    async getAIMarketResolutionSuggestion(marketId: string) {
+        const market = await this.prisma.market.findUnique({
+            where: { id: marketId },
+            select: { id: true, title: true, sourceUrl: true, source: true, closesAt: true, resolved: true, resolution: true },
+        });
+        if (!market) throw new AppError('Market not found', 404);
+
+        const suggestion = await this.resolutionService.getResolutionSuggestion(marketId);
+        return {
+            market: {
+                id: market.id,
+                title: market.title,
+                source: market.source,
+                source_url: market.sourceUrl,
+                closes_at: market.closesAt,
+                resolved: market.resolved,
+                resolution: market.resolution,
+            },
+            suggestion,
+            next_step: 'Review the suggestion and confirm with POST /api/admin/markets/:id/resolve',
         };
     }
 

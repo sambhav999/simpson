@@ -80,6 +80,7 @@ marketsRouter.post('/', requireAuth, async (req: Request, res: Response, next: N
       category: z.string().min(2).max(50),
       closes_at: z.string().datetime(),
       liquidity: z.coerce.number().positive().max(1_000_000),
+      source_url: z.string().url().optional(),
     });
 
     const body = schema.parse(req.body);
@@ -90,6 +91,7 @@ marketsRouter.post('/', requireAuth, async (req: Request, res: Response, next: N
       category: body.category.trim(),
       closesAt: new Date(body.closes_at),
       liquidity: body.liquidity,
+      sourceUrl: body.source_url,
     });
 
     res.status(201).json({

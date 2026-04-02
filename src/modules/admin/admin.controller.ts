@@ -37,6 +37,38 @@ router.post('/predictions', async (req: Request, res: Response, next: NextFuncti
     }
 });
 
+router.get('/markets/:id/resolve-suggestion', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const result = await adminService.getAIMarketResolutionSuggestion(req.params.id);
+        res.json(result);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/markets/:id/resolve', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const schema = z.object({
+            outcome: z.enum(['YES', 'NO']),
+            note: z.string().max(280).optional(),
+        });
+        const body = schema.parse(req.body);
+        const result = await adminService.manuallyResolveMarket(req.params.id, body.outcome, body.note);
+        res.json(result);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.post('/markets/:id/resolve-from-source', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const result = await adminService.resolveMarketFromSource(req.params.id);
+        res.json(result);
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST /api/admin/daily/create — Create Daily 5 battle
 router.post('/daily/create', async (req: Request, res: Response, next: NextFunction) => {
     try {

@@ -44,77 +44,224 @@ export class ResolutionService {
     let resolvedCount = 0;
 
     for (const market of pendingMarkets) {
-      // Try to get real resolution from oracle for price-based markets
-      let outcome = market.resolution;
-      
-      if (!outcome) {
-        const realOutcome = await this.oracle.getResolution(market.title);
-        if (realOutcome) {
-          logger.info(`[ResolutionService] Real outcome found for market ${market.id}: ${realOutcome}`);
-          outcome = realOutcome;
-        } else {
-          // Attempt to get real outcome from the external aggregator (Polymarket, Kalshi, etc.)
-          const aggregatorOutcome = await this.aggregator.getMarketResolution(market.source, market.externalId || '');
-          if (aggregatorOutcome) {
-            logger.info(`[ResolutionService] Real external outcome found for market ${market.id}: ${aggregatorOutcome}`);
-            outcome = aggregatorOutcome;
-          } else {
-            // Outcome not yet determined by external API or unsupported. 
-            // Skip processing to leave it pending for the next cycle.
-            logger.info(`[ResolutionService] Market ${market.id} is not yet officially resolved by source, staying pending...`);
-            continue;
-          }
-        }
-      }
-      
-      logger.info(`[ResolutionService] Resolving market ${market.id} with outcome: ${outcome} (${market.positions.length} positions)`);
-
-      const winPos = market.positions.filter(p => {
-        const side = p.betSide || p.side || (p.tokenMint === market.yesTokenMint ? 'YES' : 'NO');
-        return side === outcome;
-      });
-      const lossPos = market.positions.filter(p => {
-        const side = p.betSide || p.side || (p.tokenMint === market.yesTokenMint ? 'YES' : 'NO');
-        return side !== outcome;
-      });
-
-      for (const position of winPos) {
-        await this.settleWinningPosition(market, position, outcome);
+      const suggested = await this.getResolutionSuggestionForMarket(market);
+      if (!suggested.outcome) {
+        logger.info(`[ResolutionService] Market ${market.id} is not yet officially resolved by source, staying pending...`);
+        continue;
       }
 
-      for (const position of lossPos) {
-        await this.prisma.position.update({
-          where: { id: position.id },
-          data: {
-            amount: 0,
-            status: 'LOST',
-          },
-        });
-      }
-
-      const lossWallets = Array.from(new Set(lossPos.map((position) => position.walletAddress)));
-      if (lossWallets.length > 0) {
-        await this.prisma.user.updateMany({
-          where: { walletAddress: { in: lossWallets } },
-          data: { currentStreak: 0 },
-        });
-      }
-
-      resolvedCount += market.positions.length;
-
-      // 3. Mark market as fully resolved
-      await this.prisma.market.update({
-        where: { id: market.id },
-        data: { 
-          resolved: true, 
-          resolution: outcome,
-          status: 'resolved'
-        }
-      });
+      resolvedCount += await this.resolveLoadedMarket(market, suggested.outcome);
     }
 
     logger.info(`[ResolutionService] Successfully resolved ${resolvedCount} positions.`);
     return { resolvedPositions: resolvedCount };
+  }
+
+  async resolveMarketById(marketId: string, outcome: 'YES' | 'NO') {
+    const market = await this.prisma.market.findUnique({
+      where: { id: marketId },
+      include: {
+        positions: { where: { status: 'ACTIVE' } },
+      },
+    });
+
+    if (!market) {
+      throw new Error(`Market ${marketId} not found`);
+    }
+
+    const resolvedPositions = await this.resolveLoadedMarket(market, outcome);
+    return { marketId, outcome, resolvedPositions };
+  }
+
+  async getResolutionSuggestion(marketId: string) {
+    const market = await this.prisma.market.findUnique({
+      where: { id: marketId },
+      include: {
+        aiPredictions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!market) {
+      throw new Error(`Market ${marketId} not found`);
+    }
+
+    const sourceSuggestion = await this.getResolutionSuggestionForMarket(market);
+    if (sourceSuggestion.outcome) {
+      return {
+        marketId: market.id,
+        outcome: sourceSuggestion.outcome,
+        confidence: sourceSuggestion.confidence,
+        rationale: sourceSuggestion.rationale,
+        method: sourceSuggestion.method,
+        admin_confirmation_required: true,
+      };
+    }
+
+    const latestAi = market.aiPredictions[0];
+    if (latestAi) {
+      return {
+        marketId: market.id,
+        outcome: latestAi.prediction,
+        confidence: latestAi.confidence,
+        rationale: latestAi.commentary || latestAi.summaryCommentary || 'Latest AI Oracle prediction used as suggestion.',
+        method: 'ai_prediction',
+        admin_confirmation_required: true,
+      };
+    }
+
+    const yesPrice = typeof market.yesPrice === 'number' ? (market.yesPrice <= 1 ? market.yesPrice * 100 : market.yesPrice) : 50;
+    const noPrice = typeof market.noPrice === 'number' ? (market.noPrice <= 1 ? market.noPrice * 100 : market.noPrice) : 100 - yesPrice;
+    const impliedOutcome = yesPrice >= noPrice ? 'YES' : 'NO';
+    const impliedConfidence = Math.max(55, Math.round(Math.max(yesPrice, noPrice)));
+
+    return {
+      marketId: market.id,
+      outcome: impliedOutcome,
+      confidence: impliedConfidence,
+      rationale: `No source-backed resolution signal was found, so this suggestion falls back to current market-implied probability (${Math.round(yesPrice)}% YES / ${Math.round(noPrice)}% NO).`,
+      method: 'market_probabilities',
+      admin_confirmation_required: true,
+    };
+  }
+
+  private async resolveLoadedMarket(market: any, outcome: 'YES' | 'NO'): Promise<number> {
+    logger.info(`[ResolutionService] Resolving market ${market.id} with outcome: ${outcome} (${market.positions.length} positions)`);
+
+    const winPos = market.positions.filter((p: any) => {
+      const side = p.betSide || p.side || (p.tokenMint === market.yesTokenMint ? 'YES' : 'NO');
+      return side === outcome;
+    });
+    const lossPos = market.positions.filter((p: any) => {
+      const side = p.betSide || p.side || (p.tokenMint === market.yesTokenMint ? 'YES' : 'NO');
+      return side !== outcome;
+    });
+
+    for (const position of winPos) {
+      await this.settleWinningPosition(market, position, outcome);
+    }
+
+    for (const position of lossPos) {
+      await this.prisma.position.update({
+        where: { id: position.id },
+        data: {
+          amount: 0,
+          status: 'LOST',
+        },
+      });
+    }
+
+    const lossWallets = Array.from(new Set(lossPos.map((position: any) => position.walletAddress))) as string[];
+    if (lossWallets.length > 0) {
+      await this.prisma.user.updateMany({
+        where: { walletAddress: { in: lossWallets } },
+        data: { currentStreak: 0 },
+      });
+    }
+
+    await this.prisma.market.update({
+      where: { id: market.id },
+      data: {
+        resolved: true,
+        resolution: outcome,
+        status: 'resolved',
+      },
+    });
+
+    return market.positions.length;
+  }
+
+  private async getResolutionSuggestionForMarket(market: any): Promise<{
+    outcome: 'YES' | 'NO' | null;
+    confidence: number;
+    rationale: string;
+    method: 'oracle_title' | 'source_feed' | 'source_url' | 'unavailable';
+  }> {
+    if (market.resolution === 'YES' || market.resolution === 'NO') {
+      return {
+        outcome: market.resolution,
+        confidence: 100,
+        rationale: 'Market already has a stored final resolution.',
+        method: 'source_feed',
+      };
+    }
+
+    const oracleOutcome = await this.oracle.getResolution(market.title);
+    if (oracleOutcome) {
+      return {
+        outcome: oracleOutcome,
+        confidence: 95,
+        rationale: 'Title-based oracle rule matched a supported price market and produced a deterministic outcome.',
+        method: 'oracle_title',
+      };
+    }
+
+    const directSourceOutcome = await this.aggregator.getMarketResolution(market.source, market.externalId || '');
+    if (directSourceOutcome) {
+      return {
+        outcome: directSourceOutcome,
+        confidence: 99,
+        rationale: 'Resolution was fetched directly from the linked source market.',
+        method: 'source_feed',
+      };
+    }
+
+    const inferred = this.inferSourceFromUrl(market.sourceUrl || '');
+    if (inferred?.externalId) {
+      const sourceUrlOutcome = await this.aggregator.getMarketResolution(inferred.source, inferred.externalId);
+      if (sourceUrlOutcome) {
+        return {
+          outcome: sourceUrlOutcome,
+          confidence: 95,
+          rationale: `Resolution was inferred from the configured source URL (${inferred.source}).`,
+          method: 'source_url',
+        };
+      }
+    }
+
+    return {
+      outcome: null,
+      confidence: 0,
+      rationale: 'No deterministic source or oracle rule could resolve this market yet.',
+      method: 'unavailable',
+    };
+  }
+
+  private inferSourceFromUrl(sourceUrl?: string | null): { source: string; externalId: string } | null {
+    if (!sourceUrl) return null;
+
+    try {
+      const url = new URL(sourceUrl);
+      const hostname = url.hostname.toLowerCase();
+      const path = url.pathname.replace(/^\/+|\/+$/g, '');
+
+      if (hostname.includes('kalshi.com') && path) {
+        const ticker = path.split('/').pop();
+        if (ticker) {
+          return { source: 'kalshi', externalId: ticker.startsWith('KAL-') ? ticker : `KAL-${ticker}` };
+        }
+      }
+
+      if (hostname.includes('manifold.markets') && path) {
+        const id = path.split('/').pop();
+        if (id) {
+          return { source: 'manifold', externalId: id.startsWith('MNF-') ? id : `MNF-${id}` };
+        }
+      }
+
+      if (hostname.includes('polymarket.com')) {
+        const id = url.searchParams.get('id') || url.searchParams.get('market');
+        if (id) {
+          return { source: 'polymarket', externalId: id.startsWith('POLY-') ? id : `POLY-${id}` };
+        }
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
   }
 
   private async settleWinningPosition(market: any, position: any, outcome: string): Promise<void> {

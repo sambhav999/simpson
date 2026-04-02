@@ -90,6 +90,7 @@ export class MarketsService {
     category: string;
     closesAt: Date;
     liquidity: number;
+    sourceUrl?: string;
   }) {
     const now = new Date();
     if (input.closesAt.getTime() <= now.getTime()) {
